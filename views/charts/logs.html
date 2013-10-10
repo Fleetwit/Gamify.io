@@ -1,0 +1,45 @@
+<div class="widget-holder root" data-name="%name%">
+	<div class="widget-flipper">
+		<div class="widget-area widget-general-stats widget-front">
+			<div class="widget-head">
+				Logs (<span data-var="name"></span>)
+				<div>
+					<a href="javascript:;" onclick="flipit(this)"><i class='icon-photon x_alt widget_settings_remove'></i></a>
+					<a href="javascript:;" onclick="flipit(this)"><i class='icon-photon cog'></i></a>
+					<img src="/images/photon/w_arrows@2x.png" alt="Arrows"/>
+				</div>
+			</div>
+
+			<div style="width:300px;max-height:200px;">
+				<div class="loglist"></div>
+			</div>
+		</div>
+
+		<div class="widget-area widget-general-stats widget-back">
+			<div class="widget-savehead">
+				<a href="javascript:;" class="btn btn-mini btn-inverse widget_settings_button" onclick="flipit(this)"><i class='icon-photon cog'></i>Done</a>
+			</div>
+			<form>
+				<div class="container-fluid widget-settings">
+					<div class="control-group row-fluid">
+						<div class="span12">
+							<label class="control-label">Filter by type:</label>
+						</div>
+					</div>
+					<div class="control-group row-fluid">
+						<div class="span12">
+							<div class="controls">
+								<select data-include="true" data-require="true" data-name="name">
+									<option value="Mailstack.error">Errors: Mailstack</option>
+									<option value="Agora.error">Errors: Agora</option>
+									<option value="Daemons.error">Errors: Daemons</option>
+									<option value="Stats.error">Errors: Mission Control</option>
+								</select>
+							</div>
+						</div>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>

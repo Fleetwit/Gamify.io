@@ -1,0 +1,11 @@
+{
+	"name": 		"Gamify.io",
+	"description": 	"Gamify API Server",
+	"version":		"1.0.0",
+	"dependencies": {
+		"mongodb":		"latest",
+		"underscore":	"latest",
+		"express":		"latest"
+	}
+}
+

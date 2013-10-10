@@ -1,0 +1,38 @@
+{# if data.responses }
+	<div class="text big">{$label}</div>
+	<table style="margin-bottom:20px;">
+		<tbody>
+		{# for response,n in data.responses }
+			<tr>
+				<td style="width:150px;">
+					{$response}
+				</td>
+				<td>
+					<div class="progressbar">
+						<div class="inner" style="width:{$(n/data.total*100)}%"></div>
+						<div class="label">({$n}/{$data.total})</div>
+					</div>
+				</td>
+			</tr>
+		{# endfor }
+		</tbody>
+	</table>
+{# else }
+	<table style="border:1px solid #DEDADA;">
+		<tbody>
+		{# for subcat,subdata in data }
+			<tr>
+				<td valign="top">
+					{# if subdata.responses }{# else }
+					<div class="text big">{$subcat}:</div>
+					{# endif }
+				</td>
+				<td valign="top">
+					<!-- _self.subcell(subcat,subdata) -->
+					{# include "default/sub/surveyblock.twig" with subdata}
+				</td>
+			</tr>
+		{# endfor }
+		</tbody>
+	</table>
+{# endif }

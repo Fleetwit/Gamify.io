@@ -1,0 +1,133 @@
+.formapi_placeholder {
+	color:		#888888 !important;
+}
+.formapi_flagged {
+	background-color:		#ffd2d2 !important;
+}
+
+.radio {
+	
+}
+.radio > div {
+	cursor:					pointer;
+	background-image:		url("radio_off.png");
+	background-position:	left center;
+	background-repeat:		no-repeat;
+	padding-left:			20px;
+}
+.radio > div.selected {
+	background-image:		url("radio_on.png");
+}
+.radio.deep > div {
+	background-image:		transparent;
+	padding-left:			0;
+}
+.radio.deep > div > div {
+	cursor:					pointer;
+	background-image:		url("radio_off.png");
+	background-position:	left center;
+	background-repeat:		no-repeat;
+	padding-left:			20px;
+}
+.radio.deep > div.selected > div {
+	background-image:		url("radio_on.png");
+}
+
+.radio.scale > .radio {
+	cursor:					pointer;
+	background-image:		url("radio_off.png");
+	background-position:	bottom center;
+	background-repeat:		no-repeat;
+	padding-bottom:			16px;
+	min-width:				20px;
+	text-align:				center;
+	font-size:				11px;
+}
+.radio.scale > .radio.selected {
+	background-image:		url("radio_on.png");
+	font-weight:			bold;
+}
+
+
+.checkbox {
+	
+}
+.checkbox > div {
+	cursor:					pointer;
+	background-image:		url("checkbox_off.png");
+	background-position:	left center;
+	background-repeat:		no-repeat;
+	padding-left:			20px;
+}
+.checkbox > div.selected {
+	background-image:		url("checkbox_on.png");
+}
+
+
+.checklist {
+	border:					1px solid #DEDADA;
+}
+.checklist > div {
+	cursor:					pointer;
+	background-image:		url("checkbox_off.png");
+	background-position:	left center;
+	background-repeat:		no-repeat;
+	border-top:				1px solid #DEDADA;
+	color:					#DEDADA;
+	font-size:				11px;
+	padding:				3px;
+	padding-left:			20px;
+	/*border-bottom:			1px solid #DEDADA;*/
+}
+.checklist > div:first-child {
+	border-top:				0;
+}
+.checklist > div.selected {
+	background-image:		url("checkbox_on.png");
+	color:					#333333;
+}
+
+.div-inline > div {
+	display:				inline-block;
+	margin-right:			10px;
+	margin-bottom:			10px;
+}
+
+
+/*** DROPLIST ***/
+.droplist {
+	.border-radius(3px);
+	border:					1px solid #e3e2e2;
+	background-color:		#ffffff;
+	color:					#333333;
+	padding:				6px;
+	cursor:					pointer;
+	background-image:		url("images/droplistbg.png");
+	background-position:	right center;
+	background-repeat:		no-repeat;
+}
+.droplist_container {
+	z-index:				50000;
+	.border-radius(3px);
+	position:				absolute;
+	display:				none;
+	max-height:				200px;
+	background-color:		#ffffff;
+	border:					1px solid #e3e2e2;
+}
+.droplist_container > ul {
+	.border-radius(3px);
+	list-style:				none;
+	margin:					0;
+	padding:				0;
+}
+.droplist_container > ul > li {
+	margin:					0;
+	padding:				3px 5px;
+}
+.droplist_container > ul > li:hover {
+	background-color:		#ffffff;
+}
+.droplist_container > ul > li.selected {
+	background-color:		#ffffff;
+}

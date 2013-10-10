@@ -1,0 +1,165 @@
+{# extends "default/main.twig" }
+
+{# block content }
+<div class="main-content retracted">
+	<div class="breadcrumb-container">
+		<ul class="xbreadcrumbs">
+			<li>
+				<a href="dashboard">
+					<i class="icon-photon home"></i>
+				</a>
+			</li>
+			<li>
+				<a href="#">Races</a>
+			</li>
+			{# if uuid != false }
+			<li class="current">
+				<a href="#">{$selected.title}</a>
+			</li>
+			{# endif }
+		</ul>
+	</div>
+	
+	
+	<form class="form-horizontal" style="margin-top:50px;">
+		<div class="container-fluid">
+
+			<div class="form-legend">Select a race</div>
+			
+			<div class="control-group row-fluid">
+				<div class="span3">
+					<label class="control-label" for="selectBoxFilter">Select a race</label>
+				</div>
+				<div class="span9">
+					<div class="controls">
+						<select name="selectRace" id="selectRace">
+							<option value="">-- Select a race --</option>
+							{# for uuid,race in races }
+							<option value="{$uuid}">{$race.title}</option>
+							{# endfor }
+						</select>
+					</div>
+				</div>
+			</div>
+			
+		</div>
+	
+	
+	{# if uuid != false }
+
+		{# if step == 0 }
+			<div class="container-fluid">
+                <div id="Notifications" class="form-legend">Surveys</div>
+                <div class="control-group row-fluid">
+                    <div class="span12 span-inset">
+                       <div class="form_container"></div>
+                       <div class="btn_previous btn btn-success">&laquo; Previous</div><div class="btn_next btn btn-success">Next &raquo;</div><div class="btn_submit btn btn-success">Submit</div>
+                    </div>
+                </div>
+            </div>
+			<script type="text/javascript">
+				var surveys = [];
+				{# for survey in surveys }
+				surveys.push({label:"{$survey.name}",value:"{$survey.id}"});
+				{# endfor }
+								
+				var survey = [{
+					survey: {
+						type:			"list",
+						label:			"Survey",
+						placeholder:	"Select one",
+						required:		true,
+						list: 			surveys,
+						attr:	{
+							"data-group": "1"
+						}
+					}
+				}];
+				$(function() {
+					$(".form_container").jsurvey({
+						survey:		survey,
+						submit:		$(".btn_submit"),
+						next:		$(".btn_next"),
+						previous:	$(".btn_previous"),
+						block:		true,
+						group:		true,
+						onGroupChange:	function(groupid) {
+							
+						},
+						onSubmit:	function(data) {
+							document.location = "/surveys?uuid={$uuid}&survey="+data.survey;
+						}
+					});
+				});
+			</script>
+		{# else }
+			<div class="container-fluid">
+                <div id="Notifications" class="form-legend">Notifications</div>
+                <div class="control-group row-fluid">
+                    <div class="span3 span-inset">
+                    	<div class="form_container"></div>
+						<button class="btn_previous button green">&laquo; Previous</button><button class="btn_next button green">Next &raquo;</button><button class="btn_submit button red">Submit</button>
+                    </div>
+                    <div class="span9 span-inset">
+                    	{# include "default/sub/surveyblock.twig" with surveys}
+                    </div>
+                </div>
+            </div>
+		
+		
+			<script type="text/javascript">
+				
+				var criterias = [];
+				{# for crit in crosstabs }
+					criterias.push({
+						label:	"{$crit}",
+						value:	"{$crit}"
+					});
+				{# endfor }
+								
+				var survey = [{
+					criterias: {
+						type:			"checklist",
+						label:			"Cross-Tabulation (drag to change order)",
+						placeholder:	"",
+						required:		false,
+						list: 			criterias,
+						value:			{$criterias|json_encode},
+						attr:	{
+							"data-group": "1"
+						}
+					}
+				}];
+				$(function() {
+					$(".form_container").jsurvey({
+						survey:		survey,
+						submit:		$(".btn_submit"),
+						next:		$(".btn_next"),
+						previous:	$(".btn_previous"),
+						block:		true,
+						group:		true,
+						onGroupChange:	function(groupid) {
+							
+						},
+						onSubmit:	function(data) {
+							if (!data.criterias) {
+								data.criterias = "";
+							}
+							document.location = "stats/survey?survey={$surveyid}&criterias="+data.criterias;
+						}
+					});
+					$("#selectRace").select2().change(function() {
+						if ($(this).val() != "") {
+							document.location = "surveys?uuid="+$(this).val();
+						}
+					});
+				});
+			</script>
+		{# endif }
+	{# endif }
+	
+</div>
+
+	</form>
+
+{# endblock }

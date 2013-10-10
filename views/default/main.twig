@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0">
+		<link rel="shortcut icon" href="favicon.ico" />
+		<link rel="apple-touch-icon" href="iosicon.png" />
+		
+		{# for type,files in boost.includes }
+			{# if type == "less" }
+				{# for file in files }
+				<link rel="stylesheet/less" type="text/css" href="{$file}" />
+				{# endfor }
+			{# endif }
+		{# endfor }
+		
+		{# for type,files in boost.includes }
+			{# if type == "css" }
+				{# for file in files }
+				<link rel="stylesheet" href="{$file}" />
+				{# endfor }
+			{# endif }
+			{# if type == "js" }
+				{# for file in files }
+				<script type="text/javascript" src="{$file}"></script>
+				{# endfor }
+			{# endif }
+		{# endfor }
+		
+		{# block head }
+		<title>{#if global.title}{$global.title} - {#endif}Mission Control</title>
+		{# endblock }
+	</head>
+	
+	
+	<body class="body-dashboard">
+
+        {# include "default/sub/main_menu.twig"}
+        {# include "default/sub/user_menu.twig"}
+        
+        {# block content }{# endblock }
+
+        <div class="dashboard-watermark"></div>
+        
+    </body>
+</html>

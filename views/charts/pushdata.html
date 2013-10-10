@@ -1,0 +1,60 @@
+<div class="widget-holder widget-white root" data-name="%name%">
+	<div class="widget-flipper">
+		<div class="widget-area overall-views-graph skin-white widget-front">
+			<div class="widget-head">
+				Push :: <span data-var="service"></span>/<span data-var="period"></span>
+				<div>
+					<a href="javascript:;" onclick="flipit(this)"><i class='icon-photon x_alt widget_settings_remove'></i></a>
+					<a href="javascript:;" onclick="flipit(this)"><i class='icon-photon cog'></i></a>
+				</div>
+			</div>
+			<p class="widget-description">PushData for <span data-var="service"></span> (Grouping: <span data-var="period"></span>)</p>
+			<p class="message"></p>
+			<div id="chart_%name%" class="chart-widget" style="width:260px;height:133px;"></div>
+			<img class="widget-white-shadow" src="/images/photon/w_shadow.png" alt="shadow"/>
+		</div>
+		<div class="widget-area overall-views-graph widget-back">
+			<div class="widget-savehead">
+				<a href="javascript:;" class="btn btn-mini btn-inverse widget_settings_button" onclick="flipit(this)"><i class='icon-photon cog'></i>Done</a>
+			</div>
+			<form>
+				<div class="container-fluid widget-settings">
+					<div class="control-group row-fluid">
+						<div class="span12">
+							<label class="control-label">Service</label>
+						</div>
+					</div>
+					<div class="control-group row-fluid">
+						<div class="span12">
+							<div class="controls">
+								<select data-include="true" data-require="true" data-name="service">
+									<option selected="" value="Mailstack">Mailstack</option>
+									<option value="Agora">Agora</option>
+									<option value="Datastore">Datastore</option>
+									<option value="Daemons">Daemons</option>
+									<option value="MissionControl">Mission Control</option>
+								</select>
+							</div>
+						</div>
+					</div>
+					<div class="control-group row-fluid">
+						<div class="span12">
+							<label class="control-label">Period</label>
+						</div>
+					</div>
+					<div class="control-group row-fluid">
+						<div class="span12">
+							<div class="controls">
+								<select data-include="true" data-require="true" data-name="period">
+									<option selected="" value="seconds">Seconds</option>
+									<option value="minutes">Minutes</option>
+									<option value="hours">Hours</option>
+								</select>
+							</div>
+						</div>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
