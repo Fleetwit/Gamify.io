@@ -51,6 +51,19 @@ app.get("/:endpoint/:method/:format?", function(req, res){
 			data.params = _.extend({},JSON.parse(data.params));	// get means we need to parse
 		} catch(e) {}
 	}
+	// Fix the types
+	var i;
+	for (i in data) {
+		if (!isNaN(data[i]*1)) {
+			data[i] *= 1;
+		}
+		if (data[i] == "true") {
+			data[i] = true;
+		}
+		if (data[i] == "false") {
+			data[i] = false;
+		}
+	}
 	Gamify.api.execute(req.params.endpoint, req.params.method, data, function() {}, req.params.format, req, res);
 });
 
