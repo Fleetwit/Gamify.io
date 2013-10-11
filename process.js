@@ -33,10 +33,12 @@ if ('dev' == app.get('env')) {
 
 
 Gamify.api.init(function() {
-	console.log("API mapped.");
-	Gamify.api.execute("user","find");
-	Gamify.api.execute("user","test");
-	Gamify.api.execute("hello","world");
+	console.log("API mapped. Starting server...");
+	
+	// Start the server
+	http.createServer(app).listen(app.get('port'), function(){
+		console.log('API server listening on port ' + app.get('port'));
+	});
 });
 
 app.get("/:endpoint/:method/:format?", function(req, res){
@@ -49,13 +51,10 @@ app.get("/:endpoint/:method/:format?", function(req, res){
 			data.params = _.extend({},JSON.parse(data.params));	// get means we need to parse
 		} catch(e) {}
 	}
-	console.log("params:\n",req.params);
 	Gamify.api.execute(req.params.endpoint, req.params.method, data, function() {}, req.params.format, req, res);
 });
 
-http.createServer(app).listen(app.get('port'), function(){
-	console.log('Express server listening on port ' + app.get('port'));
-});
+
 
 
 function processArgs() {
