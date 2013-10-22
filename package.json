@@ -5,7 +5,8 @@
 	"dependencies": {
 		"mongodb":		"latest",
 		"underscore":	"latest",
-		"express":		"latest"
+		"express":		"latest",
+		"request":		"latest"
 	}
 }
 

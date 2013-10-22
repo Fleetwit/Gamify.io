@@ -1,0 +1,70 @@
+function auth() {
+	
+}
+auth.prototype.init = function(Gamify, callback){
+	var scope = this;
+	
+	this.Gamify = Gamify;
+	
+	// Return the methods
+	var methods = {
+		
+		// User's access token
+		authtoken:	function(params, callback) {
+			
+			// Are we using a system authtoken?
+			if (params.authtoken == Gamify.settings.systoken && params.uid) {
+				callback(params.uid);
+			} else {
+				scope.mongo.count({
+					collection:	'authtokens',
+					query:		{
+						token:		params.authtoken,
+						validity:	{
+							$gt:	new Date().getTime()
+						}
+					}
+				}, function(count) {
+					if (count == 0) {
+						callback(false, "Invalid AuthToken.");
+					} else {
+						// Get the user's data
+						scope.mongo.find({
+							collection:	"authtokens",
+							limit:		1,
+							query:		{
+								token:		params.authtoken,
+								validity:	{
+									$gt:	new Date().getTime()
+								}
+							}
+						}, function(response) {
+							callback(response[0].uid);
+						});
+						
+					}
+				});
+			}
+		},
+		
+		// System access only
+		sys:	function(params, callback) {
+			
+			console.log(">>>",params.authtoken == Gamify.settings.systoken);
+			
+			// Are we using a system authtoken?
+			if (params.authtoken == Gamify.settings.systoken) {
+				callback(params.uid);
+			} else {
+				callback(false, "You need a system token to call this method.");
+			}
+		}
+	};
+	
+	// Init a connection
+	this.mongo	= new this.Gamify.mongo({database:'fleetwit2'});
+	this.mongo.init(function() {
+		callback(methods);
+	});
+}
+exports.auth = auth;

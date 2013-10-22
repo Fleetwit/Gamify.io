@@ -32,6 +32,9 @@ if ('dev' == app.get('env')) {
 }
 
 
+Gamify.settings.db 			= "fleetwit2";
+Gamify.settings.systoken 	= "sys540f40c9968814199ec7ca847ec45";
+
 Gamify.api.init(function() {
 	console.log("API mapped. Starting server...");
 	
@@ -41,7 +44,7 @@ Gamify.api.init(function() {
 	});
 });
 
-app.get("/:endpoint/:method/:format?", function(req, res){
+var apiRoute = function(req, res) {
 	var data = {};
 	if (req.route.method=='post') {
 		data = _.extend({}, req.body);
@@ -65,6 +68,13 @@ app.get("/:endpoint/:method/:format?", function(req, res){
 		}
 	}
 	Gamify.api.execute(req.params.endpoint, req.params.method, data, function() {}, req.params.format, req, res);
+}
+
+app.get("/:endpoint/:method/:format?", function(req, res){
+	apiRoute(req, res);
+});
+app.post("/:endpoint/:method/:format?", function(req, res){
+	apiRoute(req, res);
 });
 
 
