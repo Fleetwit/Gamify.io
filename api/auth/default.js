@@ -40,6 +40,21 @@ auth.prototype.init = function(Gamify, callback){
 							}
 						}, function(response) {
 							callback(response[0].uid);
+							
+							// In the background, set the last activity time
+							scope.mongo.update({
+								collection:	"users",
+								query:		{
+									uid:	response[0].uid	// The auth method pass that __auth data into the params
+								},
+								data:		{
+									$set:	{
+										"data.recent_activity":	new Date()
+									}
+								}
+							}, function(response) {
+								// Don't care about the return, that's a background task
+							});
 						});
 						
 					}

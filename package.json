@@ -6,7 +6,9 @@
 		"mongodb":		"latest",
 		"underscore":	"latest",
 		"express":		"latest",
-		"request":		"latest"
+		"request":		"latest",
+		"facebook-api":	"latest",
+		"moment":		"latest"
 	}
 }
 

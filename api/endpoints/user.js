@@ -1,5 +1,7 @@
 var _ 					= require('underscore');
 var qs 					= require("querystring");
+var fbapi 				= require('facebook-api');
+var moment				= require('moment');
 
 // Users
 function api() {
@@ -59,8 +61,13 @@ api.prototype.init = function(Gamify, callback){
 				
 				// Convert "user" from a JSON string to an object if necessary
 				params	= scope.Gamify.api.fixTypes(params, {
-					user:	'object'
+					user:		'object'
 				});
+				params.user	= scope.Gamify.api.fixTypes(params.user, {
+					password:	'md5'
+				});
+				
+				console.log("params",params);
 				
 				// Find the user
 				// Update the token
@@ -167,6 +174,68 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
+		facebookLogin: {
+			require:		['fbuid','fbtoken'],
+			auth:			false,
+			callback:		function(params, req, res, callback) {
+				
+				// Check if the fbtoken is valid
+				var fbclient = fbapi.user(params.fbtoken);
+				fbclient.me.info(function(err, data) {
+					console.log("data",data);
+					if (err) {
+						callback(scope.Gamify.api.errorResponse('The facebook AuthToken used is not valid.'));
+					} else {
+						// Check if a user has this uid or this email
+						scope.mongo.count({
+							collection:	"users",
+							query:		{
+								$or:	[
+									{fbuid:	data.id*1},		// convert to a number
+									{email:	data.email}
+								]
+							}
+						}, function(count) {
+							if (count > 0) {
+								// User exists, let's login and update their fb uid (just in case, as they could have an email account without that uid)
+								scope.Gamify.api.execute("user","getAuthToken", {user: {fbuid:data.id*1}}, function(response) {
+									callback(response);
+								});
+								// Background
+								scope.Gamify.api.execute("user","set", {
+									data: {
+										fbuid:	data.id*1
+									}
+								}, function(response) {
+									// Don't care, we won't do anything with that
+								});
+							} else {
+								// User doesn't exist, let's create it.
+								var userQuery = {
+									email:		data.email,
+									password:	false,	// no password!
+									fbuid:		data.id*1,
+									firstname:	data.first_name,
+									lastname:	data.last_name
+								};
+								if (data.birthday) {
+									userQuery.dob	= moment(data.birthday, "MM/DD/YYYY").toDate();
+								}
+								scope.Gamify.api.execute("user","create", {
+									data: userQuery
+								}, function(response) {
+									callback(response);
+								});
+							}
+						});
+					}
+				});
+			}
+		},
+		
+		
+		
+		
 		find: {
 			require:		[],
 			auth:			false,
@@ -175,9 +244,14 @@ api.prototype.init = function(Gamify, callback){
 				scope.mongo.find(_.extend(params, {
 					collection:	"users",
 					fields:		{
-						email:	true,
-						uid:	true,
-						data:	true
+						email:		true,
+						uid:		true,
+						fbuid:		true,
+						firstname:	true,
+						lastname:	true,
+						dob:		true,
+						metadata:	true,
+						data:		true
 					}
 				}), function(response) {
 					callback(response);
@@ -240,6 +314,40 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
+		online: {
+			require:		[],
+			auth:			false,
+			callback:		function(params, req, res, callback) {
+				
+				params	= _.extend({
+					perpage:	5,
+					page:		1,
+					time:		1000*60*5	// in ms!
+				},params);
+				
+				scope.mongo.paginate(_.extend(params, {
+					collection:	"users",
+					query:		{
+						"data.recent_activity": {
+							$gt:	new Date(new Date().getTime()-params.time)
+						}
+					}
+				}), function(response) {
+					var nextParam		= _.extend({},params);
+					nextParam.page 		= response.pagination.current+1;
+					var prevParam		= _.extend({},params);
+					prevParam.page		= response.pagination.current-1;
+					
+					response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
+					response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
+					callback(response);
+				});
+			}
+		},
+		
+		
+		
+		
 		setlocation: {
 			require:		['location'],
 			auth:			"authtoken",
@@ -247,15 +355,24 @@ api.prototype.init = function(Gamify, callback){
 				
 				// Get the location
 				scope.Gamify.api.execute("geo","encode", {location: params.location}, function(response) {
+					
+					// prepare the meta data
+					var i;
+					var metadatas = {};
+					for (i in response.levels) {
+						metadatas['metadata.'+i] 	= response.levels[i];
+					}
+					metadatas['metadata.timezone'] 	= response.timezone;
+					
 					scope.mongo.update({
 						collection:	"users",
 						query:		{
 							uid:	params.__auth	// The auth method pass that __auth data into the params
 						},
 						data:		{
-							$set:	{
-								location:	response
-							}
+							$set:	_.extend(metadatas, {
+								location:		response
+							})
 						}
 					}, function() {
 						callback(response);

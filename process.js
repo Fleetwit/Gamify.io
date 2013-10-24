@@ -32,7 +32,7 @@ if ('dev' == app.get('env')) {
 }
 
 
-Gamify.settings.db 			= "fleetwit2";
+Gamify.settings.db 			= "dev";
 Gamify.settings.systoken 	= "sys540f40c9968814199ec7ca847ec45";
 
 Gamify.api.init(function() {

@@ -79,6 +79,7 @@ api.prototype.init = function(Gamify, callback){
 									uid:	params.user.uid,
 									alias:	params.alias,
 									type:	response[0].type,
+									latest:	new Date(),
 									history:	[	// Remember when the user unlocked the achievements
 										new Date()
 									],
@@ -98,6 +99,7 @@ api.prototype.init = function(Gamify, callback){
 										type:	response.type,
 									},
 									data:			{
+										latest:		new Date(),
 										$push:	{
 											history: new Date()
 										},
@@ -138,6 +140,7 @@ api.prototype.init = function(Gamify, callback){
 			auth:			'authtoken',
 			callback:		function(params, req, res, callback) {
 				
+				// Start with getting the list of achievements the user unlocked
 				scope.mongo.find({
 					collection:	scope.collections.general,
 					query:	{
