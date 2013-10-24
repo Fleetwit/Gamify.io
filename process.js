@@ -76,6 +76,16 @@ app.get("/:endpoint/:method/:format?", function(req, res){
 app.post("/:endpoint/:method/:format?", function(req, res){
 	apiRoute(req, res);
 });
+app.get("/", function(req, res){
+	res.set("Content-Type", "application/json");
+	res.send(200, JSON.stringify({
+		name:		"Gamify API Server",
+		version:	Gamify.version,
+		db:			Gamify.settings.db,
+		options:	options,
+		endpoints:	Gamify.api.endpoints
+	}, null, 4));
+});
 
 
 
