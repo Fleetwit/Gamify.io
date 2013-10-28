@@ -15,7 +15,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		create_client: {
 			require:		[],
-			auth:			false,
+			auth:			"sys",
+			description:	"Create a new client",
+			params:			{},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= scope.Gamify.api.fixTypes(params, {});
@@ -36,6 +40,10 @@ api.prototype.init = function(Gamify, callback){
 		create: {
 			require:		['client','data'],
 			auth:			false,
+			description:	"Create a new race",
+			params:			{client:'UUID of the client',data:'Race data'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params["data"]	= scope.Gamify.api.fixTypes(params["data"], {
@@ -61,6 +69,10 @@ api.prototype.init = function(Gamify, callback){
 		paginate: {
 			require:		[],
 			auth:			false,
+			description:	"Paginate the races",
+			params:			{query:'MongoDB Query'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= _.extend({
@@ -112,6 +124,10 @@ api.prototype.init = function(Gamify, callback){
 		upcoming: {
 			require:		[],
 			auth:			false,
+			description:	"Paginated list of upcoming races",
+			params:			{private:'Boolean. If set to <code>true</code>, will only return the private races. If set to <code>false</code>, only returns the public races.'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= scope.Gamify.api.fixTypes(params, {
@@ -134,6 +150,10 @@ api.prototype.init = function(Gamify, callback){
 		past: {
 			require:		[],
 			auth:			false,
+			description:	"Paginated list of past races",
+			params:			{private:'Boolean. If set to <code>true</code>, will only return the private races. If set to <code>false</code>, only returns the public races.'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= scope.Gamify.api.fixTypes(params, {
@@ -157,6 +177,10 @@ api.prototype.init = function(Gamify, callback){
 		register: {
 			require:		['race'],
 			auth:			'authtoken',
+			description:	"Register a user for a race",
+			params:			{race:'UUID of the race'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// Are we registered yet?
@@ -189,6 +213,10 @@ api.prototype.init = function(Gamify, callback){
 		is_registered: {
 			require:		['race'],
 			auth:			'authtoken',
+			description:	"Check if the user is registered to the race.",
+			params:			{race:'UUID of the race'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				scope.mongo.find({
 					collection:	'users',

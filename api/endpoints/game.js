@@ -24,6 +24,10 @@ api.prototype.init = function(Gamify, callback){
 		start: {
 			require:		['game','duration'],
 			auth:			'authtoken',
+			description:	"Start a new game. Returns a game token, required to send scores, end the game, and other game-specific functions.",
+			params:			{game:"string - Game ID",duration:"milliseconds"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				var token 	= scope.Gamify.crypto.md5(scope.Gamify.uuid.v4());
@@ -71,6 +75,10 @@ api.prototype.init = function(Gamify, callback){
 		sendscore: {
 			require:		['token','score','time','level'],
 			auth:			'authtoken',
+			description:	"Send the score for a level",
+			params:			{token:"Game token, returned by game.start",score:"int",time:"milliseconds - Time taken by the level.",level:"int"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params.data	= scope.Gamify.api.fixTypes(params.data, {
@@ -125,6 +133,10 @@ api.prototype.init = function(Gamify, callback){
 		end: {
 			require:		['token'],
 			auth:			'authtoken',
+			description:	"End a game, validate the score.",
+			params:			{token:"Game token, returned by game.start"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// First we get the score data
@@ -188,6 +200,10 @@ api.prototype.init = function(Gamify, callback){
 		ranking: {
 			require:		['game'],
 			auth:			false,
+			description:	"Returns the ranking for a game, paginated. Only game sessions ended using game.end will appear.",
+			params:			{game:"string - Game ID"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				

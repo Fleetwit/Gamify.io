@@ -15,7 +15,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		create: {
 			require:		[],
-			auth:			false,
+			auth:			'sys',
+			description:	"Create a new client.",
+			params:			{},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= scope.Gamify.api.fixTypes(params, {});
@@ -36,6 +40,10 @@ api.prototype.init = function(Gamify, callback){
 		find: {
 			require:		[],
 			auth:			false,
+			description:	"Find a client.",
+			params:			{query:"MongoDB Query"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				scope.mongo.find(_.extend({
@@ -52,6 +60,10 @@ api.prototype.init = function(Gamify, callback){
 		paginate: {
 			require:		[],
 			auth:			false,
+			description:	"Paginate the clients",
+			params:			{query:"MongoDB Query"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= _.extend({
@@ -61,7 +73,10 @@ api.prototype.init = function(Gamify, callback){
 				
 				scope.mongo.paginate(_.extend({
 					collection:	"clients",
-					query:		{}
+					query:		{},
+					sort:		{
+						name:	true
+					}
 				}, params), function(response) {
 					var nextParam		= _.extend({},params);
 					nextParam.page 		= response.pagination.current+1;

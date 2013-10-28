@@ -17,6 +17,10 @@ api.prototype.init = function(Gamify, callback){
 		encode: {
 			require:		['location'],
 			auth:			false,
+			description:	"Receive a natural language location, and output the precise data for that location: city, state, country, zipcode, timezone, GPS coordinates, corected address, ...",
+			params:			{location:"string"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				request.get('http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='+escape(params.location), function (error, response, body) {

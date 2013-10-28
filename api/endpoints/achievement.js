@@ -20,6 +20,10 @@ api.prototype.init = function(Gamify, callback){
 		create: {
 			require:		['data'],
 			auth:			'sys',
+			description:	"Create a new achievement.",
+			params:			{data:{multi:'bool: Define if an achievement can be unlocked more than once.',name:"string - public name. Can be edited.",alias:"string - Internal name. If edited, all unlocked achievements are lost.",type:"string - type of achievement."}},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= scope.Gamify.api.fixTypes(params, {
@@ -44,9 +48,13 @@ api.prototype.init = function(Gamify, callback){
 			}	
 		},
 		
-		give: {
+		unlock: {
 			require:		['alias','user'],
 			auth:			'sys',
+			description:	"Unlock an achievement for a user",
+			params:			{alias:"Achievement\'s alias",user:{uid:"md5"}},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// Create a new UUID for that achievement
@@ -124,6 +132,10 @@ api.prototype.init = function(Gamify, callback){
 		find: {
 			require:		[],
 			auth:			'sys',
+			description:	"Search for an achievement",
+			params:			{query:"object"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				scope.mongo.find(_.extend(params, {
@@ -138,6 +150,10 @@ api.prototype.init = function(Gamify, callback){
 		get: {
 			require:		['type'],
 			auth:			'authtoken',
+			description:	"Get the user's achievements. All, unlocked or locked.",
+			params:			{type:"string: [all/unlocked/locked]"},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// Start with getting the list of achievements the user unlocked

@@ -19,6 +19,10 @@ api.prototype.init = function(Gamify, callback){
 		importRaces: {
 			require:		[],
 			auth:			'sys',
+			description:	"Import the races from the old Fleetwit database to the new one (currently '"+Gamify.settings.db+"')",
+			params:			{},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// Reset the data

@@ -2,6 +2,7 @@
 * Module dependencies.
 */
 var _ 			= require('underscore');
+var Twig 		= require("twig");
 var express 	= require('express');
 var http 		= require('http');
 var path 		= require('path');
@@ -18,6 +19,13 @@ var app = express();
 // all environments
 app.set('port', process.env.PORT || options.port);
 app.set('env', options.env);
+app.set('views', __dirname + '/api/doc/templates');
+app.set('view engine', 'twig');
+app.set('view cache', false);
+app.disable('view cache');
+app.set("twig options", {
+	strict_variables: false
+});
 app.use(express.favicon());
 app.use(express.logger('dev'));
 app.use(express.cookieParser());

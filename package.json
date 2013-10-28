@@ -8,6 +8,7 @@
 		"express":		"latest",
 		"request":		"latest",
 		"facebook-api":	"latest",
+		"twig": 		"*",
 		"moment":		"latest"
 	}
 }

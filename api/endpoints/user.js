@@ -21,6 +21,10 @@ api.prototype.init = function(Gamify, callback){
 		validateAuthToken: {
 			require:		['authtoken'],
 			auth:			false,
+			description:	"",
+			params:			{authtoken:'md5'},
+			status:			'deprecated',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				
@@ -57,6 +61,10 @@ api.prototype.init = function(Gamify, callback){
 		getAuthToken: {
 			require:		['user'],
 			auth:			false,
+			description:	"Identify a user and returns an authtoken to be used for private api methods.",
+			params:			{user:'object'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// Convert "user" from a JSON string to an object if necessary
@@ -114,6 +122,10 @@ api.prototype.init = function(Gamify, callback){
 		create: {
 			require:		['data'],
 			auth:			false,
+			description:	"Create a new user using arbitrary data.",
+			params:			{data:'object'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params.data	= scope.Gamify.api.fixTypes(params.data, {
@@ -177,6 +189,10 @@ api.prototype.init = function(Gamify, callback){
 		facebookLogin: {
 			require:		['fbuid','fbtoken'],
 			auth:			false,
+			description:	"Identify a user using a facebook id and authtoken, and returns an authtoken to be used for private api methods.",
+			params:			{fbuid:'facebook id',fbtoken:'facebook authtoken'},
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// Check if the fbtoken is valid
@@ -238,7 +254,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		find: {
 			require:		[],
+			params:			{},
 			auth:			false,
+			description:	"Search for users. Returns only the public informations.",
+			status:			'unstable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				scope.mongo.find(_.extend(params, {
@@ -264,7 +284,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		get: {
 			require:		[],
+			params:			{},
 			auth:			'authtoken',
+			description:	"Get the user's complete profile data.",
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				scope.mongo.find(_.extend(params, {
@@ -288,7 +312,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		paginate: {
 			require:		[],
+			params:			{},
 			auth:			false,
+			description:	"Get a list of users, with pagination. Can be filtered using the 'query' parameter (object).",
+			status:			'unstable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= _.extend({
@@ -316,7 +344,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		online: {
 			require:		[],
+			params:			{},
 			auth:			false,
+			description:	"Get a paginated list of currently online users.",
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				params	= _.extend({
@@ -350,7 +382,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		setlocation: {
 			require:		['location'],
+			params:			{},
 			auth:			"authtoken",
+			description:	"Set a user's location, in natural language. Example: 'Soho, New York City'. The location is geo-encoded and added to the user's meta-datas.",
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				// Get the location
@@ -387,7 +423,11 @@ api.prototype.init = function(Gamify, callback){
 		
 		set: {
 			require:		['data'],
-			auth:			"authtoken",
+			params:			{},
+			auth:			"sys",
+			description:	"Save a data on the user's profile.",
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 			
@@ -409,9 +449,13 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
-		setdata: {
+		setMetadata: {
 			require:		['data'],
+			params:			{},
 			auth:			"authtoken",
+			description:	"Save a meta-data on the user's profile.",
+			status:			'stable',
+			version:		1,
 			callback:		function(params, req, res, callback) {
 				
 				
