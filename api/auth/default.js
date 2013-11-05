@@ -11,7 +11,6 @@ auth.prototype.init = function(Gamify, callback){
 		
 		// User's access token
 		authtoken:	function(params, callback) {
-			
 			// Are we using a system authtoken?
 			if (params.authtoken == Gamify.settings.systoken && params.uid) {
 				callback(params.uid);
@@ -77,7 +76,7 @@ auth.prototype.init = function(Gamify, callback){
 	};
 	
 	// Init a connection
-	this.mongo	= new this.Gamify.mongo({database:'fleetwit2'});
+	this.mongo	= new this.Gamify.mongo({database:this.Gamify.settings.db});
 	this.mongo.init(function() {
 		callback(methods);
 	});

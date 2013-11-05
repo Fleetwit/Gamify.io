@@ -25,17 +25,10 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
-				var endpoints = Gamify.api.endpoints;
-				
-				/*var endpoint;
-				var method;
-				for (endpoint in endpoints) {
-					for (method in endpoints[endpoint]) {
-						
-					}
-				}*/
-				
-				res.render("doc", {endpoints:endpoints,systoken:Gamify.settings.systoken}, function(err, html) {
+				res.render("doc", {
+					endpoints:	Gamify.api.endpoints,
+					systoken:	Gamify.settings.systoken
+				}, function(err, html) {
 					callback(html);
 				});
 			}

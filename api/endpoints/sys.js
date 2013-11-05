@@ -21,8 +21,8 @@ api.prototype.init = function(Gamify, callback){
 			auth:			'sys',
 			description:	"Import the races from the old Fleetwit database to the new one (currently '"+Gamify.settings.db+"')",
 			params:			{},
-			status:			'stable',
-			version:		1,
+			status:			'unstable',
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
 				// Reset the data
@@ -44,34 +44,60 @@ api.prototype.init = function(Gamify, callback){
 							// Let's register them.
 							var i;
 							var stack	= new Gamify.stack();
+							
 							console.log("clients",clients[0].data.clients.length);
 							console.log("\033[33m"+clients[0].data.clients.length+"\033[0m clients found.");
+							
 							for (i=0;i<clients[0].data.clients.length;i++) {
 								stack.add(function(params, onProcessed) {
 									
 									// remove the races from the client data
 									delete params.client.races;
 									
-									scope.Gamify.api.execute("race","create_client", params.client, function(exec_response) {
+									scope.Gamify.api.execute("race","create_client", {data:params.client, authtoken:Gamify.settings.systoken}, function(exec_response) {
 										var stackRace	= new Gamify.stack();
 										var j;
+										
 										if (params.races && params.races.length) {
+											
 											console.log("\033[33m"+params.races.length+"\033[0m races found for client \033[33m",params.client.name,"\033[0m");
+											
 											for (j=0;j<params.races.length;j++) {
+												
 												stackRace.add(function(params2, onProcessed) {
 													
-													// Copy the prizes to .prize
+													// Copy the prizes to .prize (rename the variable)
 													params2.race.prizes = params2.race.prices;
+													
 													// Delete the prizes
 													delete params2.race.prices;
 													
-													scope.Gamify.api.execute("race","create", {
-														client:		params.client.uuid,
-														data:		params2.race
-													}, function(exec_response2) {
-														onProcessed();
+													// Get the surveys if there are some
+													scope.mongo_old.find({
+														collection:	'surveys',
+														query:		{
+															id:		params2.race.survey
+														}
+													}, function(surveys) {
+														if (surveys && surveys.length > 0) {
+															var survey = surveys[0];
+															params2.race.survey = survey;
+														} else {
+															params2.race.survey = [];
+														}
+														
+														scope.Gamify.api.execute("race","create", {
+															client:		params.client.uuid,
+															data:		params2.race,
+															authtoken:	Gamify.settings.systoken
+														}, function(exec_response2) {
+															onProcessed();
+														});
 													});
+													
+													
 												}, {race: params.races[j]});
+												
 											}
 											stackRace.process(function() {
 												console.log("\t> All races processed.");

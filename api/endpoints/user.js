@@ -23,7 +23,7 @@ api.prototype.init = function(Gamify, callback){
 			auth:			false,
 			description:	"",
 			params:			{authtoken:'md5'},
-			status:			'deprecated',
+			status:			'stable',
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
@@ -132,15 +132,20 @@ api.prototype.init = function(Gamify, callback){
 					password:	'md5'
 				});
 				
-				
+				// Account Creation method
 				var create_account = function() {
 					var uid = scope.Gamify.crypto.md5(scope.Gamify.uuid.v4());
-						
+					
+					var userdata = _.extend({
+						avatar:		"images/avatar-default.png"
+					},params.data, {
+						uid:		uid
+					});
+					console.log("userdata",userdata);
+					
 					scope.mongo.insert({
 						collection:		'users',
-						data:			_.extend(params.data, {
-							uid:		uid
-						})
+						data:			userdata
 					}, function() {
 						scope.Gamify.api.execute("user","getAuthToken", {user: {uid:uid}}, function(response) {
 							callback(response);
@@ -191,59 +196,127 @@ api.prototype.init = function(Gamify, callback){
 			auth:			false,
 			description:	"Identify a user using a facebook id and authtoken, and returns an authtoken to be used for private api methods.",
 			params:			{fbuid:'facebook id',fbtoken:'facebook authtoken'},
-			status:			'stable',
-			version:		1,
+			status:			'unstable',
+			version:		1.1,
 			callback:		function(params, req, res, callback) {
 				
 				// Check if the fbtoken is valid
 				var fbclient = fbapi.user(params.fbtoken);
 				fbclient.me.info(function(err, data) {
-					console.log("data",data);
+					
 					if (err) {
 						callback(scope.Gamify.api.errorResponse('The facebook AuthToken used is not valid.'));
 					} else {
-						// Check if a user has this uid or this email
-						scope.mongo.count({
-							collection:	"users",
-							query:		{
-								$or:	[
-									{fbuid:	data.id*1},		// convert to a number
-									{email:	data.email}
-								]
-							}
-						}, function(count) {
-							if (count > 0) {
-								// User exists, let's login and update their fb uid (just in case, as they could have an email account without that uid)
-								scope.Gamify.api.execute("user","getAuthToken", {user: {fbuid:data.id*1}}, function(response) {
-									callback(response);
-								});
-								// Background
-								scope.Gamify.api.execute("user","set", {
-									data: {
-										fbuid:	data.id*1
-									}
-								}, function(response) {
-									// Don't care, we won't do anything with that
-								});
-							} else {
-								// User doesn't exist, let's create it.
-								var userQuery = {
-									email:		data.email,
-									password:	false,	// no password!
-									fbuid:		data.id*1,
-									firstname:	data.first_name,
-									lastname:	data.last_name
-								};
-								if (data.birthday) {
-									userQuery.dob	= moment(data.birthday, "MM/DD/YYYY").toDate();
+						
+						// Used to check if a user exists using a fb uid or an email
+						var uidCheck = function(cb) {
+							scope.mongo.find({
+								collection:	'users',
+								query:		{
+									fbuid:	data.id*1
+								},
+								limit:	1
+							}, function(response) {
+								if (response && response.length > 0) {
+									cb(response[0]);
+								} else {
+									cb(false);
 								}
-								scope.Gamify.api.execute("user","create", {
-									data: userQuery
-								}, function(response) {
-									callback(response);
-								});
-							}
-						});
+							});
+						}
+						
+						// Used to check if a user exist using an authtoken
+						var AuthtokenCheck = function(cb) {
+							scope.Gamify.api.execute("user","validateAuthToken", {authtoken: params.authtoken}, function(response) {
+								if (response && response.valid) {
+									cb(response.user, response);
+								} else {
+									cb(false);
+								}
+							});
+						}
+						
+						// Create or update the facebook account
+						var fbLink = function(user, auth_response) {
+							// Get the list of friends
+							fbclient.me.friends(function(err, friendlist) {
+								var friends = [];
+								var i;
+								var l = friendlist.length;
+								for (i=0;i<l;i++) {
+									friends.push(friendlist[i].id*1);
+								}
+								
+								// Update/Create the account
+								if (user) {
+									// User exists, let's login and update their fb uid (just in case, as they could have an email account without that uid)
+									
+									// If this is present, then the user was already logged in. He's just linking his account.
+									if (auth_response) {
+										scope.Gamify.api.execute("user","set", {
+											authtoken:		scope.Gamify.settings.systoken,
+											query:			{
+												uid:	user.uid
+											},
+											data: {
+												fbuid:		data.id*1,
+												fbfriends:	friends
+											}
+										}, function(response) {
+											// Don't care, we won't do anything with that
+										});
+									} else {
+										// User is logging in using facebook.
+										scope.Gamify.api.execute("user","getAuthToken", {user: {fbuid:data.id*1}}, function(response) {
+											callback(response);
+											// Save/update the list of friends
+											scope.Gamify.api.execute("user","set", {
+												authtoken:		scope.Gamify.settings.systoken,
+												query:			{
+													uid:	response.user
+												},
+												data: {
+													fbuid:		data.id*1,
+													fbfriends:	friends
+												}
+											}, function(response) {
+												// Don't care, we won't do anything with that
+											});
+										});
+									}
+									
+								} else {
+									// User doesn't exist, let's create it.
+									var userQuery = {
+										email:		data.email,
+										password:	false,	// no password!
+										fbuid:		data.id*1,
+										firstname:	data.first_name,
+										lastname:	data.last_name,
+										fbfriends:	friends
+									};
+									if (data.birthday) {
+										userQuery.dob	= moment(data.birthday, "MM/DD/YYYY").toDate();
+									}
+									scope.Gamify.api.execute("user","create", {
+										data:			userQuery
+									}, function(response) {
+										callback(response);
+									});
+								}
+							});
+						};
+						
+						if (params.authtoken) {
+							AuthtokenCheck(function(response, auth_response) {
+								fbLink(response, auth_response);
+							});
+						} else {
+							uidCheck(function(response) {
+								fbLink(response);
+							});
+						}
+						
 					}
 				});
 			}
@@ -258,22 +331,28 @@ api.prototype.init = function(Gamify, callback){
 			auth:			false,
 			description:	"Search for users. Returns only the public informations.",
 			status:			'unstable',
-			version:		1,
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
 				scope.mongo.find(_.extend(params, {
 					collection:	"users",
 					fields:		{
-						email:		true,
-						uid:		true,
-						fbuid:		true,
-						firstname:	true,
-						lastname:	true,
-						dob:		true,
-						metadata:	true,
-						data:		true
+						password:	false,
+						racedata:	false,
+						fbfriends:	false
 					}
 				}), function(response) {
+					var i;
+					var l = response.length;
+					for (i=0;i<l;i++) {
+						response[i].fullname = response[i].firstname+" "+response[i].lastname;
+						response[i].state = {
+							gender:		!(!response[i].metadata || !response[i].metadata.gender),
+							age:		!(!response[i].metadata || !response[i].metadata.age),
+							location:	!(!response[i].metadata || !response[i].metadata.location),
+							facebook:	!(!response[i].fbuid)
+						};
+					}
 					callback(response);
 				});
 			}
@@ -291,7 +370,7 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
-				scope.mongo.find(_.extend(params, {
+				scope.mongo.find(_.extend(params,{
 					collection:	"users",
 					query:		{
 						uid:	params.__auth
@@ -331,6 +410,19 @@ api.prototype.init = function(Gamify, callback){
 					nextParam.page 		= response.pagination.current+1;
 					var prevParam		= _.extend({},params);
 					prevParam.page		= response.pagination.current-1;
+					
+					var i;
+					var l = response.data.length;
+					for (i=0;i<l;i++) {
+						response.data[i].fullname = response.data[i].firstname+" "+response.data[i].lastname;
+						response.data[i].state = {
+							gender:		!(!response.data[i].metadata || !response.data[i].metadata.gender),
+							age:		!(!response.data[i].metadata || !response.data[i].metadata.age),
+							location:	!(!response.data[i].metadata || !response.data[i].metadata.location),
+							facebook:	!(!response.data[i].fbuid)
+						};
+					}
+					
 					
 					response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
 					response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
@@ -422,14 +514,46 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		set: {
-			require:		['data'],
+			require:		['data','query'],
 			params:			{},
 			auth:			"sys",
 			description:	"Save a data on the user's profile.",
 			status:			'stable',
-			version:		1,
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
+			
+				scope.mongo.update({
+					collection:	"users",
+					query:		params.query,
+					data:		{
+						$set:	params.data
+					}
+				}, function() {
+					callback({set:true});
+				});
+				
+			}
+		},
+		
+		
+		
+		
+		setMetas: {
+			require:		['data'],
+			params:			{},
+			auth:			"authtoken",
+			description:	"Save a meta-data on the user's profile.",
+			status:			'stable',
+			version:		1.1,
+			callback:		function(params, req, res, callback) {
+				
+				
+				var data = {};
+				var i;
+				for (i in params.data) {
+					data["metadatas."+i] = params.data[i];
+				}
 			
 				scope.mongo.update({
 					collection:	"users",
@@ -437,9 +561,9 @@ api.prototype.init = function(Gamify, callback){
 						uid:	params.__auth	// The auth method pass that __auth data into the params
 					},
 					data:		{
-						$set:	params.data
+						$set:	data
 					}
-				}, function() {
+				}, function(response) {
 					callback(response);
 				});
 				
@@ -449,13 +573,40 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
-		setMetadata: {
+		getMetas: {
+			require:		['query'],
+			params:			{},
+			auth:			'sys',
+			description:	"Get the user's meta-datas.",
+			status:			'stable',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				scope.mongo.find(_.extend(params, {
+					collection:	"users",
+					query:		params.query,
+					limit:		1,
+					fields:		"metadatas",
+				}), function(response) {
+					if (response.length == 0) {
+						callback(false);
+					} else {
+						callback(response[0]);
+					}
+				});
+			}
+		},
+		
+		
+		
+		
+		setData: {
 			require:		['data'],
 			params:			{},
 			auth:			"authtoken",
-			description:	"Save a meta-data on the user's profile.",
+			description:	"Save a data on the user's profile.",
 			status:			'stable',
-			version:		1,
+			version:		1.1,
 			callback:		function(params, req, res, callback) {
 				
 				
@@ -478,7 +629,155 @@ api.prototype.init = function(Gamify, callback){
 				});
 				
 			}
-		}
+		},
+		
+		
+		
+		
+		getChallenges: {
+			require:		[],
+			params:			{},
+			auth:			"authtoken",
+			description:	"Get the challenges",
+			status:			'stable',
+			version:		1.1,
+			callback:		function(params, req, res, callback) {
+				
+				// Get the user's data:
+				scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true}}, function(user) {
+					
+					scope.mongo.paginate({
+						collection:	"challenges",
+						query:		{
+							fbuid:		user.fbuid,
+							accepted:	false,
+							refused:	false
+						}
+					}, function(response) {
+						
+						var nextParam		= _.extend({},params);
+						nextParam.page 		= response.pagination.current+1;
+						var prevParam		= _.extend({},params);
+						prevParam.page		= response.pagination.current-1;
+						
+						// Process the data
+						var i;
+						var l 		= response.data.length;
+						var uids	= [];
+						for (i=0;i<l;i++) {
+							response.data[i].race = Gamify.data.races.getByAlias(response.data[i].race);
+							delete response.data[i].race.survey;
+							delete response.data[i].race.games;
+							// List the uids
+							uids.push(response.data[i].uid);
+						}
+						
+						// List the users
+						scope.Gamify.api.execute("user","find", {
+							query:	{
+								uid:	{
+									$in:	uids
+								}
+							}
+						}, function(users) {
+							users = Gamify.utils.indexed(users, "uid");
+							console.log("users",users);
+							for (i=0;i<l;i++) {
+								if (users[response.data[i].uid]) {
+									response.data[i].user = users[response.data[i].uid];
+								} else {
+									response.data[i].user = false;
+								}
+							}
+							
+							response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
+							response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
+							callback(response);
+						});
+						
+						
+					});
+				});
+				
+			}
+		},
+		
+		
+		
+		
+		getFriends: {
+			require:		[],
+			params:			{},
+			auth:			"authtoken",
+			description:	"List the user's friends, paginated.",
+			status:			'stable',
+			version:		1.1,
+			callback:		function(params, req, res, callback) {
+				
+				scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true,fbfriends:true}}, function(user) {
+					
+					
+					scope.Gamify.api.execute("user","paginate", {
+						query:		{
+							fbuid:		{
+								$in:	user.fbfriends
+							}
+						}
+					}, callback);
+				});
+				
+			}
+		},
+		
+		
+		
+		
+		log: {
+			require:		['data'],
+			params:			{},
+			auth:			'authtoken',
+			description:	"Log a user action",
+			status:			'unstable',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				// Get the user's metas
+				scope.mongo.find({
+					collection:	"users",
+					query:		{
+						uid:	params.__auth
+					},
+					limit:		1,
+					fields:		{
+						metadatas:	true
+					}
+				}, function(response) {
+					
+					console.log("response",response);
+					
+					if (!response || response.length == 0) {
+						callback(false);
+					} else {
+						var metas = {};
+						if (response[0] && response[0].metadatas) {
+							metas = response[0].metadatas;
+						}
+						
+						// Now we log the action
+						scope.mongo.insert({
+							collection:		"userlogs",
+							data:			_.extend({
+								date:			new Date(),
+								uid:			params.__auth,
+								metas:			metas
+							},params.data)
+						}, function() {
+							callback({logged: true});
+						});
+					}
+				});
+			}
+		},
 	};
 	
 	// Init a connection
