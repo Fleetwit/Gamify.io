@@ -40,6 +40,8 @@ api.prototype.init = function(Gamify, callback){
 					return false;
 				}
 				
+				//console.log("race",JSON.stringify(race,null,4));
+				
 				// Calculate the duration
 				var i;
 				var l = race.games.length;
@@ -58,6 +60,31 @@ api.prototype.init = function(Gamify, callback){
 					
 					var user = user_response[0];
 					
+					var starts_in	= Gamify.settings.default_race_time;		// Default timer
+					var can_play	= true;
+					
+					// Check if the race is live
+					var race = Gamify.data.races.getByAlias(params.alias);
+					//console.log(">>>>>>>>>>>",JSON.stringify(race, null, 4));
+					// Does the race exists?
+					if (race) {
+						var race_starts_in	= new Date(race.start_time).getTime()-new Date().getTime();
+						// live race? Make sure you are not too late
+						if (params.live == true) {
+							// If you're too late, you can't play!
+							if (race_starts_in < (Gamify.settings.max_min_late*60*1000)*-1) {
+								can_play = false;
+							}
+							starts_in 			= race_starts_in;
+						} else {
+							// Not a live race. Make sure the user is not trying to play a future race tho.
+							if (race_starts_in > 0) {
+								// Race is in the future!
+								can_play = false;
+							}
+						}
+					}
+					
 					scope.mongo.insert({
 						collection:	scope.collections.scores,
 						data:		{
@@ -66,9 +93,11 @@ api.prototype.init = function(Gamify, callback){
 							live:		params.live,
 							maxtime:	duration*1000,
 							registered:	new Date(),
+							late:		starts_in<0,
+							snapshot:	starts_in,
 							started:	false,
 							ended:		false,
-							token:	token,		// Game token, used to submit scores
+							token:		can_play?token:false,		// Game token, used to submit scores
 							scores:	[],
 							result:	{
 								score:		0,
@@ -76,12 +105,13 @@ api.prototype.init = function(Gamify, callback){
 								multiplier:	0,
 								total:		0
 							},
-							user:	user.metas
+							metas:		_.extend({},user.metas)
 						}
 					}, function(response) {
 						callback({
-							token:	token,
-							timer:	5000	//@TODO: update based ont he race
+							token:		can_play?token:false,	// No token if you can't play!
+							timer:		starts_in,
+							can_play:	can_play
 						});
 					});
 				});
@@ -204,6 +234,7 @@ api.prototype.init = function(Gamify, callback){
 				scope.Gamify.api.execute("user","find", {query:{uid: params.__auth}}, function(user_response) {
 					
 					var user = user_response[0];
+					//console.log("\033[35m user:\033[37m",user);
 					
 					// First we get the score data
 					scope.mongo.find({
@@ -213,17 +244,23 @@ api.prototype.init = function(Gamify, callback){
 							uid:	params.__auth
 						},
 						fields:	{
-							result:		true,
+							result:	true,
 							maxtime:	true,
-							race:		true
+							race:		true,
+							live:		true
 						}
 					}, function(response) {
-						console.log("\n\n\n\n\nResponse",response);
+						//console.log("\033[35m response:\033[37m",response);
 						var results = response[0].result;
 						var maxtime = response[0].maxtime;
 						
 						// Now we calculate the time multiplier
-						var multiplier	= (1 - (results.time/maxtime)) + 1;
+						if (response[0].late) {
+							// User was late. We need to deduce that time from their score...
+							var multiplier	= (1 - (Math.max((results.time+response[0].snapshot), maxtime)/maxtime)) + 1;	// max() is there to not have negative multipliers
+						} else {
+							var multiplier	= (1 - (results.time/maxtime)) + 1;
+						}
 						
 						// Update the data (we're gonna reuse them instead of re-doing another query to get the db's copy)
 						results.total		= results.score*multiplier;
@@ -233,7 +270,8 @@ api.prototype.init = function(Gamify, callback){
 							collection:	scope.collections.scores,
 							query:		{
 								token:	params.token,
-								uid:	params.__auth
+								uid:	params.__auth,
+								live:	response[0].live
 							},
 							data:		{
 								$set:	{
@@ -249,7 +287,7 @@ api.prototype.init = function(Gamify, callback){
 								query:			{
 									race:		response[0].race,
 									live:		response[0].live,
-									"result.total":	{
+									"results.total":	{
 										$gt:	results.total
 									}
 								}
@@ -259,7 +297,8 @@ api.prototype.init = function(Gamify, callback){
 								// Send the position
 								callback({
 									result:		results,
-									position:	count+1
+									position:	count+1,
+									live:		response[0].live
 								});
 								
 								// Save the score
@@ -272,6 +311,7 @@ api.prototype.init = function(Gamify, callback){
 											fbuid:	user.fbuid
 										}],
 										race:			response[0].race,
+										live:			response[0].live,
 										winner:		{
 											$exists:	false
 										}
@@ -296,48 +336,70 @@ api.prototype.init = function(Gamify, callback){
 												fbuid:	user.fbuid
 											}],
 											race:			response[0].race,
+											live:			response[0].live,
 											winner:		{
 												$exists:	false
 											}
 										},
 									}, function(challenges) {
+										console.log("\033[35m challenges:\033[37m",challenges);
+										
 										var i;
 										var l = challenges.length;
 										for (i=0;i<l;i++) {
-											// Only process if there are more than 2 results
-											if (challenges[i].results && challenges[i].results.length >= 2) {
-												// Check if there are more then one player
-												var players = [];
-												var best		= 0;
-												var bestPlayer	= "";
-												var j;
-												var l2 = challenges[i].results.length;
-												for (j=0;j<l2;j++) {
-													players.push(challenges[i].results[j].uid);
-													if (challenges[i].results[j].total > best) {
-														best 		= challenges[i].results[j].total;
-														bestPlayer	= challenges[i].results[j].uid;
+											(function(challenge) {
+												// Only process if there are more than 2 results
+												if (challenge.results && challenge.results.length >= 2) {
+													// Check if there are more than one player
+													var players = [];
+													var best		= 0;
+													var bestPlayer	= "";
+													var j;
+													var l2 = challenge.results.length;
+													for (j=0;j<l2;j++) {
+														players.push(challenge.results[j].uid);
+														if (challenge.results[j].total > best) {
+															best 		= challenge.results[j].total;
+															bestPlayer	= challenge.results[j].uid;
+														}
+													}
+													players = _.uniq(players);
+													if (players.length == 2) {
+														
+														console.log("\033[35m challenge:\033[37m",challenge.uuid);
+														console.log("\033[35m players:\033[37m",players);
+														console.log("\033[35m bestPlayer:\033[37m",bestPlayer);
+														console.log("\033[35m bestScore:\033[37m",best);
+														
+														// Set the winner!
+														scope.mongo.update({
+															collection:		scope.collections.challenges,
+															query:			{
+																uuid:	challenge.uuid
+															},
+															data: {
+																$set: {
+																	winner:		bestPlayer,
+																	bestScore:	best
+																}
+															}
+														}, function(update_done) {
+															
+														});
+														
+														// In the background, give the achievement
+														Gamify.api.execute("achievement","unlock", {
+															authtoken:		Gamify.settings.systoken,
+															user:	{
+																uid:		bestPlayer
+															},
+															alias:	"challenge_win"
+														}, function(unlocked_done) {
+															console.log("\033[35m [>challenge_win]:\033[37m",unlocked_done);
+														});
 													}
 												}
-												players = _.uniq(players);
-												if (players.length == 2) {
-													// Set the winner!
-													scope.mongo.update({
-														collection:		scope.collections.challenges,
-														query:			{
-															uuid:	challenges[i].uuid
-														},
-														data: {
-															$set: {
-																winner:		bestPlayer,
-																bestScore:	best
-															}
-														}
-													}, function(update_done) {
-														
-													});
-												}
-											}
+											})(challenges[i]);
 										}
 									});
 									
@@ -555,6 +617,18 @@ api.prototype.init = function(Gamify, callback){
 							}
 						}, function(done) {
 							callback({accepted: true, live:	response[0].live, race:	response[0].race});
+							
+							
+							// In the background, give the achievement
+							Gamify.api.execute("achievement","unlock", {
+								authtoken:		Gamify.settings.systoken,
+								user:	{
+									uid:		response[0].uid
+								},
+								alias:	"challenge_accepted"
+							}, function(unlocked_done) {
+								console.log("\033[35m [>live_register]:\033[37m",unlocked_done);
+							});
 						});
 					} else {
 						callback(Gamify.api.errorResponse("This challenge doesn't exist."));
@@ -605,49 +679,7 @@ api.prototype.init = function(Gamify, callback){
 				});
 				
 			}
-		},
-		
-		
-		
-		
-		/*
-		test: {
-			require:		[],
-			auth:			'authtoken',
-			description:	"Decline a challenge.",
-			params:			{challenge:"Challenge's UUID"},
-			status:			'stable',
-			version:		1,
-			callback:		function(params, req, res, callback) {
-				
-				scope.Gamify.api.execute("user","find", {query:{uid: params.__auth}}, function(user_response) {
-					
-					var user = user_response[0];
-					
-					// Search for challenges
-					scope.mongo.find({
-						collection:		scope.collections.challenges,
-						query:			{
-							$or:	[{
-								uid:	user.uid
-							},{
-								fbuid:	user.fbuid
-							}],
-							accepted:	true
-						}
-					}, function(challenges) {
-						if (response && response.length > 0) {
-							
-						} else {
-							
-						}
-					});
-					
-				}
-				
-			}
-		},
-		*/
+		}
 	};
 	
 	// Init a connection

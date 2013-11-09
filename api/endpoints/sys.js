@@ -29,11 +29,11 @@ api.prototype.init = function(Gamify, callback){
 				scope.mongo.remove({
 					collection:	'clients'
 				}, function() {
-					console.log("\033[33mClients\033[0m removed.");
+					//console.log("\033[33mClients\033[0m removed.");
 					scope.mongo.remove({
 						collection:	'races'
 					}, function() {
-					console.log("\033[33mRaces\033[0m removed.");
+					//console.log("\033[33mRaces\033[0m removed.");
 						
 						// Find the original race data
 						scope.mongo_old.find({
@@ -45,13 +45,14 @@ api.prototype.init = function(Gamify, callback){
 							var i;
 							var stack	= new Gamify.stack();
 							
-							console.log("clients",clients[0].data.clients.length);
-							console.log("\033[33m"+clients[0].data.clients.length+"\033[0m clients found.");
+							//console.log("clients",clients[0].data.clients.length);
+							//console.log("\033[33m"+clients[0].data.clients.length+"\033[0m clients found.");
 							
 							for (i=0;i<clients[0].data.clients.length;i++) {
 								stack.add(function(params, onProcessed) {
 									
 									// remove the races from the client data
+									params.client = _.extend({},params.client);
 									delete params.client.races;
 									
 									scope.Gamify.api.execute("race","create_client", {data:params.client, authtoken:Gamify.settings.systoken}, function(exec_response) {
@@ -60,7 +61,7 @@ api.prototype.init = function(Gamify, callback){
 										
 										if (params.races && params.races.length) {
 											
-											console.log("\033[33m"+params.races.length+"\033[0m races found for client \033[33m",params.client.name,"\033[0m");
+											//console.log("\033[33m"+params.races.length+"\033[0m races found for client \033[33m",params.client.name,"\033[0m");
 											
 											for (j=0;j<params.races.length;j++) {
 												
@@ -100,11 +101,11 @@ api.prototype.init = function(Gamify, callback){
 												
 											}
 											stackRace.process(function() {
-												console.log("\t> All races processed.");
+												//console.log("\t> All races processed.");
 												onProcessed();
 											}, false);
 										} else {
-											console.log("No races found for client \033[33m",params.client.name,"\033[0m");
+											//console.log("No races found for client \033[33m",params.client.name,"\033[0m");
 											onProcessed();
 										}
 										

@@ -194,6 +194,21 @@ $.apicall({
 	}
 });
 </pre>
+<h4>NodeJS</h4>
+<pre>
+Gamify.api.execute("{$endpoint}","{$method}", { {{if specs.auth}}
+{{if specs.auth == "sys"}}
+
+	authtoken: "{$systoken}",{{endif}}{{if specs.auth == "authtoken"}}
+	
+	authtoken: "user token",{{endif}}{{endif}}{{ for label,value in specs.params }}
+	
+	{$label}: "{$value}"{{if loop.last}}{{else}},{{endif}}{{ endfor }}
+	
+}, function(response) {
+	
+});
+</pre>
 						</div>
 						{{ endfor }}
 					</div>

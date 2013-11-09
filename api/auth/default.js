@@ -14,6 +14,8 @@ auth.prototype.init = function(Gamify, callback){
 			// Are we using a system authtoken?
 			if (params.authtoken == Gamify.settings.systoken && params.uid) {
 				callback(params.uid);
+			} else if (params.__auth && params.__authcheck == Gamify.settings.systoken) {
+				callback(params.__auth);
 			} else {
 				scope.mongo.count({
 					collection:	'authtokens',

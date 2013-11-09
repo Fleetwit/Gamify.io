@@ -52,6 +52,7 @@ exports.dataProvider = function (Gamify) {
 		};
 		this.getByAlias = function(alias) {
 			if (scope.racesAlias[alias]) {
+				console.log("Alias: ",alias, JSON.stringify(scope.racesAlias[alias],null,4));
 				return scope.racesAlias[alias];
 			} else {
 				return false;

@@ -40,8 +40,10 @@ if ('dev' == app.get('env')) {
 }
 
 
-Gamify.settings.db 			= "dev";
-Gamify.settings.systoken 	= "sys540f40c9968814199ec7ca847ec45";
+Gamify.settings.db 					= "dev";
+Gamify.settings.systoken 			= "sys540f40c9968814199ec7ca847ec45";
+Gamify.settings.max_min_late		= 10;		// min
+Gamify.settings.default_race_time	= 15000;	// ms
 
 Gamify.api.init(function() {
 	console.log("API mapped. Starting server...");

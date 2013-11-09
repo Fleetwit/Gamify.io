@@ -57,6 +57,10 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
+				params	= scope.Gamify.api.fixTypes(params, {
+					user:	'object'
+				});
+				
 				// Create a new UUID for that achievement
 				var uuid = scope.Gamify.crypto.md5(scope.Gamify.uuid.v4());
 				
@@ -91,23 +95,27 @@ api.prototype.init = function(Gamify, callback){
 									history:	[	// Remember when the user unlocked the achievements
 										new Date()
 									],
-									count:	1
+									count:	1,
+									'new':	true
 								}
 							}, function() {
 								callback({status:'created'})
 							});
 						} else {
 							if (multi) {
+								
 								// User has the achievement but he can get it twice
 								scope.mongo.update({
 									collection:		scope.collections.general,
 									query:			{
 										uid:	params.user.uid,
-										alias:	params.alias,
-										type:	response.type,
+										alias:	params.alias
 									},
 									data:			{
-										latest:		new Date(),
+										$set: {
+											latest:		new Date(),
+											'new':		true
+										},
 										$push:	{
 											history: new Date()
 										},
@@ -132,7 +140,7 @@ api.prototype.init = function(Gamify, callback){
 		find: {
 			require:		[],
 			auth:			'sys',
-			description:	"Search for an achievement",
+			description:	"Search for an achievement (model, not unlocked)",
 			params:			{query:"object"},
 			status:			'stable',
 			version:		1,
@@ -151,9 +159,9 @@ api.prototype.init = function(Gamify, callback){
 			require:		['type'],
 			auth:			'authtoken',
 			description:	"Get the user's achievements. All, unlocked or locked.",
-			params:			{type:"string: [all/unlocked/locked]"},
-			status:			'stable',
-			version:		1,
+			params:			{type:"string: [all/unlocked/locked]",grouped:"Bool - group by type."},
+			status:			'dev',
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
 				// Start with getting the list of achievements the user unlocked
@@ -161,6 +169,9 @@ api.prototype.init = function(Gamify, callback){
 					collection:	scope.collections.general,
 					query:	{
 						uid:		params.__auth
+					},
+					sort:		{
+						latest:	-1
 					},
 					limit:	500
 				}, function(achievements) {
@@ -203,24 +214,133 @@ api.prototype.init = function(Gamify, callback){
 						limit:	500
 					}, function(achievements_raw) {
 						
-						var output = {};
+						
 						
 						// Index the achievements by alias
 						var indexed_model = Gamify.utils.indexed(achievements_raw, "alias");
 						
-						for (i in indexed_model) {
-							if (!output[indexed_model[i].type]) {
-								output[indexed_model[i].type] = [];
+						if (params.grouped) {
+							var output = {};	// Object!
+							for (i in indexed_model) {
+								if (!output[indexed_model[i].type]) {
+									output[indexed_model[i].type] = [];
+								}
+								if (indexed_unlocked[indexed_model[i].alias]) {
+									indexed_model[i].unlocked 	= true;
+									indexed_model[i].data 		= indexed_unlocked[indexed_model[i].alias];
+								} else {
+									indexed_model[i].unlocked = false;
+								}
+								output[indexed_model[i].type].push(indexed_model[i]);
 							}
+						} else {
+							var output = [];	// Array!
+							for (i in indexed_model) {
+								
+								if (indexed_unlocked[indexed_model[i].alias]) {
+									indexed_model[i].unlocked 	= true;
+									indexed_model[i].data 		= indexed_unlocked[indexed_model[i].alias];
+								} else {
+									indexed_model[i].unlocked = false;
+								}
+								output.push(indexed_model[i]);
+							}
+						}
+						
+						// Sort by unlock date
+						output.sort(function(a,b) {
+							if (b.data && b.data.latest && a.data && a.data.latest) {
+								return new Date(b.data.latest).getTime() - new Date(a.data.latest).getTime();
+							}
+							return 0;
+						});
+						callback(output);
+					});
+				});
+			}
+		},
+		
+		
+		
+		getnew: {
+			require:		[],
+			auth:			'authtoken',
+			description:	"Get the new achievements. This will set them as read.",
+			params:			{},
+			status:			'dev',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				// Start with getting the list of achievements the user unlocked
+				scope.mongo.find({
+					collection:	scope.collections.general,
+					query:	{
+						uid:		params.__auth,
+						'new':		true
+					},
+					sort:		{
+						latest:	-1
+					},
+					limit:	500
+				}, function(achievements) {
+					var aliases = [];
+					var i;
+					// Now we list the alias, and we get the real data
+					for (i in achievements) {
+						aliases.push(achievements[i].alias);
+					}
+					aliases = _.uniq(aliases);
+					
+					var indexed_unlocked = Gamify.utils.indexed(achievements, "alias");
+					
+					query = {
+						alias:	{
+							$in:	aliases
+						}
+					};
+					
+					// Now let's get the data
+					scope.mongo.find({
+						collection:	scope.collections.list,
+						query:	query,
+						limit:	500
+					}, function(achievements_raw) {
+						
+						
+						
+						// Index the achievements by alias
+						var indexed_model = Gamify.utils.indexed(achievements_raw, "alias");
+						
+						var output = [];	// Array!
+						for (i in indexed_model) {
+							
 							if (indexed_unlocked[indexed_model[i].alias]) {
 								indexed_model[i].unlocked 	= true;
 								indexed_model[i].data 		= indexed_unlocked[indexed_model[i].alias];
 							} else {
 								indexed_model[i].unlocked = false;
 							}
-							output[indexed_model[i].type].push(indexed_model[i]);
+							output.push(indexed_model[i]);
 						}
 						callback(output);
+						
+						if (output.length > 0) {
+							// In the background, let's mark those as read.
+							scope.mongo.update({
+								collection:	scope.collections.general,
+								query:	{
+									uid:		params.__auth,
+									'new':		true
+								},
+								data:	{
+									$set:	{
+										'new':	false
+									}
+								}
+							}, function() {
+								
+							});
+						}
 					});
 				});
 			}

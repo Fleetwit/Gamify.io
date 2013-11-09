@@ -75,7 +75,7 @@ api.prototype.init = function(Gamify, callback){
 					password:	'md5'
 				});
 				
-				console.log("params",params);
+				//console.log("params",params);
 				
 				// Find the user
 				// Update the token
@@ -141,7 +141,7 @@ api.prototype.init = function(Gamify, callback){
 					},params.data, {
 						uid:		uid
 					});
-					console.log("userdata",userdata);
+					//console.log("userdata",userdata);
 					
 					scope.mongo.insert({
 						collection:		'users',
@@ -472,13 +472,13 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
-		setlocation: {
+		setLocation: {
 			require:		['location'],
 			params:			{},
 			auth:			"authtoken",
 			description:	"Set a user's location, in natural language. Example: 'Soho, New York City'. The location is geo-encoded and added to the user's meta-datas.",
 			status:			'stable',
-			version:		1,
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
 				// Get the location
@@ -488,9 +488,9 @@ api.prototype.init = function(Gamify, callback){
 					var i;
 					var metadatas = {};
 					for (i in response.levels) {
-						metadatas['metadata.'+i] 	= response.levels[i];
+						metadatas['metadatas.'+i] 	= response.levels[i];
 					}
-					metadatas['metadata.timezone'] 	= response.timezone;
+					metadatas['metadatas.timezone'] 	= response.timezone;
 					
 					scope.mongo.update({
 						collection:	"users",
@@ -636,69 +636,142 @@ api.prototype.init = function(Gamify, callback){
 		
 		getChallenges: {
 			require:		[],
-			params:			{},
+			params:			{started:"Bool - return the challenges we accepted but didn't play yet."},
 			auth:			"authtoken",
 			description:	"Get the challenges",
-			status:			'stable',
-			version:		1.1,
+			status:			'dev',
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
-				// Get the user's data:
-				scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true}}, function(user) {
-					
-					scope.mongo.paginate({
-						collection:	"challenges",
-						query:		{
-							fbuid:		user.fbuid,
-							accepted:	false,
-							refused:	false
-						}
-					}, function(response) {
+				if (params.started) {
+					// Get the user's data:
+					scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true}}, function(user) {
 						
-						var nextParam		= _.extend({},params);
-						nextParam.page 		= response.pagination.current+1;
-						var prevParam		= _.extend({},params);
-						prevParam.page		= response.pagination.current-1;
-						
-						// Process the data
-						var i;
-						var l 		= response.data.length;
-						var uids	= [];
-						for (i=0;i<l;i++) {
-							response.data[i].race = Gamify.data.races.getByAlias(response.data[i].race);
-							delete response.data[i].race.survey;
-							delete response.data[i].race.games;
-							// List the uids
-							uids.push(response.data[i].uid);
-						}
-						
-						// List the users
-						scope.Gamify.api.execute("user","find", {
-							query:	{
-								uid:	{
-									$in:	uids
-								}
+						scope.mongo.find({
+							collection:	"challenges",
+							query:		{
+								$or: [{
+									fbuid:		user.fbuid
+								},{
+									uid:		user.uid
+								}],
+								accepted:	true,
+								refused:	false
 							}
-						}, function(users) {
-							users = Gamify.utils.indexed(users, "uid");
-							console.log("users",users);
-							for (i=0;i<l;i++) {
-								if (users[response.data[i].uid]) {
-									response.data[i].user = users[response.data[i].uid];
-								} else {
-									response.data[i].user = false;
+						}, function(response) {
+							
+							response = _.filter(response, function(item) {
+								if (!item.results) {
+									return true;
 								}
+								var i;
+								var l = item.results.length;
+								var hasUser = false;
+								for (i=0;i<l;i++) {
+									if (item.results[i].uid == params.__auth) {
+										hasUser = true;
+									}
+								}
+								return !hasUser;
+							});
+							
+							// Process the data
+							var i;
+							var l 		= response.length;
+							var uids	= [];
+							for (i=0;i<l;i++) {
+								response[i].race = _.extend({},Gamify.data.races.getByAlias(response[i].race));
+								delete response[i].race.survey;
+								delete response[i].race.games;
+								// List the uids
+								uids.push(response[i].uid);
+							}
+							uids = _.uniq(uids);
+							
+							
+							// List the users
+							scope.Gamify.api.execute("user","find", {
+								query:	{
+									uid:	{
+										$in:	uids
+									}
+								}
+							}, function(users) {
+								users = Gamify.utils.indexed(users, "uid");
+								//console.log("users",users);
+								var l = response.length;
+								for (i=0;i<l;i++) {
+									if (users[response[i].uid]) {
+										response[i].user = users[response[i].uid];
+									} else {
+										response[i].user = false;
+									}
+								}
+								
+								callback(response);
+							});
+							
+							
+							
+						});
+					});
+				} else {
+					// Get the user's data:
+					scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true}}, function(user) {
+						
+						scope.mongo.paginate({
+							collection:	"challenges",
+							query:		{
+								fbuid:		user.fbuid,
+								accepted:	false,
+								refused:	false
+							}
+						}, function(response) {
+							
+							var nextParam		= _.extend({},params);
+							nextParam.page 		= response.pagination.current+1;
+							var prevParam		= _.extend({},params);
+							prevParam.page		= response.pagination.current-1;
+							
+							// Process the data
+							var i;
+							var l 		= response.data.length;
+							var uids	= [];
+							for (i=0;i<l;i++) {
+								response.data[i].race = _.extend({},Gamify.data.races.getByAlias(response.data[i].race));
+								delete response.data[i].race.survey;
+								delete response.data[i].race.games;
+								// List the uids
+								uids.push(response.data[i].uid);
 							}
 							
-							response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
-							response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
-							callback(response);
+							// List the users
+							scope.Gamify.api.execute("user","find", {
+								query:	{
+									uid:	{
+										$in:	uids
+									}
+								}
+							}, function(users) {
+								users = Gamify.utils.indexed(users, "uid");
+								//console.log("users",users);
+								for (i=0;i<l;i++) {
+									if (users[response.data[i].uid]) {
+										response.data[i].user = users[response.data[i].uid];
+									} else {
+										response.data[i].user = false;
+									}
+								}
+								
+								response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
+								response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
+								callback(response);
+							});
+							
+							
 						});
-						
-						
 					});
-				});
-				
+				}
 			}
 		},
 		
@@ -753,10 +826,10 @@ api.prototype.init = function(Gamify, callback){
 					}
 				}, function(response) {
 					
-					console.log("response",response);
+					//console.log("response",response);
 					
 					if (!response || response.length == 0) {
-						callback(false);
+						callback(scope.Gamify.api.errorResponse('This user doesn\'t exist.'));
 					} else {
 						var metas = {};
 						if (response[0] && response[0].metadatas) {

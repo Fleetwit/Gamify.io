@@ -24,7 +24,7 @@ api.prototype.init = function(Gamify, callback){
 				
 				params.data	= scope.Gamify.api.fixTypes(params.data, {});
 				
-				console.log("PARAMS:::",params);
+				//console.log("PARAMS:::",params);
 				
 				scope.mongo.insert({
 					collection:		'clients',
@@ -72,62 +72,204 @@ api.prototype.init = function(Gamify, callback){
 			require:		[],
 			auth:			false,
 			description:	"Paginate the races",
-			params:			{query:'MongoDB Query'},
-			status:			'stable',
-			version:		1,
+			params:			{query:'MongoDB Query',sort:"Sort options",options:"Pagination options"},
+			status:			'dev',
+			version:		1.4,
 			callback:		function(params, req, res, callback) {
+				
+				//console.log("\n\n\n\n\n\n\n\033[32mParams1:\033[0m",params);
 				
 				params	= _.extend({
 					perpage:	5,
 					page:		1,
 					query:		{},
-					sort:		{}
+					sort:		{},
+					options:	{}
 				},params);
 				
-				console.log("Query::",{
-					collection:	"races",
-					query:		_.extend({},params.query)
-				});
+				if (params.upcoming) {
+					params.query.start_time 	= {$gt:	new Date()};
+					params.sort.start_time		= 1;
+				}
+				if (params.past) {
+					params.query.start_time 	= {$lt:	new Date()};
+					params.sort.start_time		= -1;
+				}
 				
-				scope.mongo.paginate({
-					collection:	"races",
-					query:		_.extend({},params.query),
-					sort:		_.extend({},params.sort)
-				}, function(response) {
-					var nextParam		= _.extend({},params);
-					nextParam.page 		= response.pagination.current+1;
-					var prevParam		= _.extend({},params);
-					prevParam.page		= response.pagination.current-1;
-					
-					if (req && req.path) {
-						response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
-						response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
-					}
-					
-					// Get the list of client ids
-					var clientIds = [];
-					var i;
-					for (i in response.data) {
-						clientIds.push(response.data[i].client);
-					}
-					
-					// Get the clients now
-					scope.Gamify.api.execute("client","find",{
-						uuid:	{
-							$in: clientIds
+				var paginate = function() {
+					//console.log("\n\n\n\n\n\n\n\033[32mParams2:\033[0m",JSON.stringify(params,null,4));
+				
+					scope.mongo.paginate(_.extend(params.options,{
+						collection:	"races",
+						query:		_.extend({},params.query),
+						sort:		_.extend({},params.sort),
+						page:		params.page
+					}), function(response) {
+						var nextParam		= _.extend({},params);
+						nextParam.page 		= response.pagination.current+1;
+						var prevParam		= _.extend({},params);
+						prevParam.page		= response.pagination.current-1;
+						
+						if (req && req.path) {
+							response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
+							response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
 						}
-					}, function(data) {
-						// Index the data by key
-						data = scope.Gamify.utils.indexed(data,'uuid');
-						// Assign the data
+						
+						//*** Modify the data
+						
+						// Get the list of client ids
+						var clientIds 	= [];
+						// Get the list of race aliases
+						var raceAliases = [];
+						var i;
 						for (i in response.data) {
-							response.data[i].client = data[response.data[i].client];
+							clientIds.push(response.data[i].client);
+							raceAliases.push(response.data[i].alias);
 						}
-						callback(response);
+						clientIds 		= _.uniq(clientIds);
+						raceAliases 	= _.uniq(raceAliases);
+						
+						var stack	= new Gamify.stack();
+						
+						// Get the client data
+						stack.add(function(param, onProcessed) {
+								
+							// Get the clients now
+							scope.Gamify.api.execute("client","find",{
+								uuid:	{
+									$in: clientIds
+								}
+							}, function(data) {
+								// Index the data by key
+								data = scope.Gamify.utils.indexed(data,'uuid');
+								// Assign the data
+								for (i in response.data) {
+									response.data[i].client 	= data[response.data[i].client];
+									response.data[i].starts_in	= new Date(response.data[i].start_time).getTime()-new Date().getTime();
+								}
+								onProcessed();
+								//callback(response);
+							});
+						});
+						
+						// If we are connected
+						if (params.__auth) {
+							// Get the race registration status
+							stack.add(function(param, onProcessed) {
+								scope.mongo.find({
+									collection:		"userlogs",
+									query:			{
+										uid:	params.__auth,
+										race:	{
+											$in:	raceAliases
+										}
+									},
+									fields:		{
+										metas: false
+									}
+								}, function(registrations) {
+									registrations = Gamify.utils.indexed(registrations, "race");
+									
+									//console.log("\n\n\n\n\n\n\n\033[32m registrations:\033[0m",registrations);
+									
+									// Tell if we are registered
+									for (i in response.data) {
+										response.data[i].state = {};
+										if (registrations[response.data[i].alias]) {
+											response.data[i].state.registered 	= true;
+										} else {
+											response.data[i].state.registered 	= false;
+										}
+									}
+									onProcessed();
+								});
+							});
+							
+							
+							// Get the best score
+							stack.add(function(param, onProcessed) {
+								scope.mongo.aggregate({
+									collection:		"scores",
+									match:			{
+										$match:	{
+											uid:	params.__auth,
+											live:	false
+										}
+									},
+									group:			{
+										$group: {
+											_id: '$race',
+											total:	{
+												$max:	'$result.total'
+											}
+										}
+									}
+								}, function(aggregated_data) {
+									
+									
+									var user_scores	= Gamify.utils.indexed(aggregated_data, "_id");
+									
+									//console.log("\n\n\n\n\n\n\n\033[32m aggregated_data:\033[0m",aggregated_data,JSON.stringify(user_scores,null,4));
+									
+									
+									for (i in response.data) {
+										if (user_scores[response.data[i].alias] && user_scores[response.data[i].alias].total > 0) {
+											response.data[i].played 	= {
+												score:	user_scores[response.data[i].alias].total
+											};
+										} else {
+											response.data[i].played 	= false;
+										}
+									}
+									
+									onProcessed();
+								});
+							});
+						}
+						
+						stack.process(function() {
+							callback(response);
+						}, false);
 					});
-					
-					
-				});
+				};
+				
+				
+				
+				
+				
+				
+				// Privacy
+				if (params.__auth) {
+					scope.Gamify.api.execute("user","find", {query:{uid: params.__auth}}, function(user_response) {
+						var user = user_response[0];
+						//console.log("user found:: ",user);
+						if (user.email) {
+							var maildomain 	= user.email.split('@');
+							maildomain 		= maildomain[1];
+							
+							params.query	= _.extend(params.query,{
+								$or: [{
+									private:	false
+								},{
+									private:	true,
+									domains:	{
+										$in:	[maildomain]
+									}
+								}]
+							});
+							
+							paginate();
+						}
+						
+						
+					});
+				} else {
+					// Only show the public races
+					params.query	= _.extend(params.query,{
+						private:	false
+					});
+					paginate();
+				}
 			}
 		},
 		
@@ -136,13 +278,18 @@ api.prototype.init = function(Gamify, callback){
 			auth:			false,
 			description:	"Paginated list of upcoming races",
 			params:			{uid:'User\'s uid'},
-			status:			'unstable',
+			status:			'deprecated',
 			version:		1.1,
 			callback:		function(params, req, res, callback) {
 				
+				params	= _.extend({
+					query:		{},
+					sort:		{},
+					options:	{}
+				},params);
 				
 				var paginate = function(query) {
-					scope.Gamify.api.execute("race","paginate", {
+					scope.Gamify.api.execute("race","paginate", _.extend({options:params.options, page:params.page, __auth:params.__auth},{
 						query:	_.extend(query, {
 							start_time: {
 								$gt:	new Date()
@@ -151,7 +298,7 @@ api.prototype.init = function(Gamify, callback){
 						sort:	{
 							start_time:	1
 						}
-					}, callback, null, req);
+					}), callback, null, req);
 				};
 				
 				if (params.uid) {
@@ -192,13 +339,20 @@ api.prototype.init = function(Gamify, callback){
 			require:		[],
 			auth:			false,
 			description:	"Paginated list of past races",
-			params:			{uid:'User\'s uid'},
-			status:			'unstable',
+			params:			{uid:'User\'s uid',options:"Pagination options"},
+			status:			'deprecated',
 			version:		1.1,
 			callback:		function(params, req, res, callback) {
 				
+				
+				params	= _.extend({
+					query:		{},
+					sort:		{},
+					options:	{}
+				},params);
+				
 				var paginate = function(query) {
-					scope.Gamify.api.execute("race","paginate", {
+					scope.Gamify.api.execute("race","paginate", _.extend({options:params.options, page:params.page, __auth:params.__auth},{
 						query:	_.extend(query, {
 							start_time: {
 								$lt:	new Date()
@@ -207,7 +361,7 @@ api.prototype.init = function(Gamify, callback){
 						sort:	{
 							start_time:	-1
 						}
-					}, callback, null, req);
+					}), callback, null, req);
 				};
 				
 				if (params.uid) {
@@ -252,7 +406,7 @@ api.prototype.init = function(Gamify, callback){
 			status:			'stable',
 			version:		1.1,
 			callback:		function(params, req, res, callback) {
-				console.log("params",params);
+				//console.log("params",params);
 				scope.mongo.find({
 					collection:	"races",
 					query:		params
@@ -289,9 +443,9 @@ api.prototype.init = function(Gamify, callback){
 		register: {
 			require:		['race'],
 			auth:			'authtoken',
-			description:	"Register a user for a race",
+			description:	"Deprecated. Use user.log with <code>{data:{action:'race.register',race:'race_alias'}}</code> instead.",
 			params:			{race:'UUID of the race'},
-			status:			'stable',
+			status:			'deprecated',
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
@@ -330,34 +484,23 @@ api.prototype.init = function(Gamify, callback){
 			auth:			'authtoken',
 			description:	"Check if the user is registered to the race.",
 			params:			{race:'UUID of the race'},
-			status:			'stable',
-			version:		1,
+			status:			'unstable',
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
-				console.log(">>>>>>>>>>> params",params);
 				
-				scope.mongo.find({
-					collection:	'users',
+				scope.mongo.count({
+					collection:	'userlogs',
 					query:		{
 						uid:	params.__auth,
-						racedata: {
-							$elemMatch:	{
-								type:	"registration",
-								race:	params.race
-							}
-						}
+						race:	params.race
 					},
 					fields:		{
-						racedata: {
-							$elemMatch:	{
-								type:	"registration",
-								race:	params.race
-							}
-						}
+						metas:	false
 					}
-				}, function(response) {
-					if (response.length > 0 && response[0].racedata && response[0].racedata.length > 0) {
-						callback({registered: true, on: response[0].racedata[0].time});
+				}, function(count) {
+					if (count > 0) {
+						callback({registered: true});
 					} else {
 						callback({registered: false});
 					}
