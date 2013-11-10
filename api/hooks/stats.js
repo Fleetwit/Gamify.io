@@ -105,7 +105,7 @@ exports.hooks = function (Gamify) {
 			}
 		});
 		Gamify.hook.register("user", "log", function(params, response) {
-			if (params.data && params.data.action == "race.register" && response.logged == true) {
+			if (params.data && params.data.action == "race.register" && response.logged == true && response.isnew == true) {
 				// Race registration sucessful
 				Gamify.api.execute("achievement","unlock", {
 					authtoken:		Gamify.settings.systoken,

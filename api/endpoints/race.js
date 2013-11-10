@@ -146,6 +146,25 @@ api.prototype.init = function(Gamify, callback){
 								for (i in response.data) {
 									response.data[i].client 	= data[response.data[i].client];
 									response.data[i].starts_in	= new Date(response.data[i].start_time).getTime()-new Date().getTime();
+									
+									// Check the end time and duration
+									var duration = 0;
+									if (response.data[i].games && response.data[i].games.length > 0) {
+										var j 	= 0;
+										var l2 	= response.data[i].games.length;
+										for (j=0;j<l2;j++) {
+											try {
+												var _settings = JSON.parse(response.data[i].games[j].settings);
+												console.log("-----------------------------------------------------------------\n_settings",_settings);
+											} catch (e) {}
+											if (_settings && _settings.time) {
+												duration += _settings.time;
+											}
+										}
+										
+									}
+									response.data[i].end_time	= new Date(response.data[i].start_time+duration).getTime();
+									response.data[i].ends_in	= new Date(response.data[i].start_time+duration).getTime()-new Date().getTime();
 								}
 								onProcessed();
 								//callback(response);
@@ -483,9 +502,9 @@ api.prototype.init = function(Gamify, callback){
 			require:		['race'],
 			auth:			'authtoken',
 			description:	"Check if the user is registered to the race.",
-			params:			{race:'UUID of the race'},
-			status:			'unstable',
-			version:		1.2,
+			params:			{race:'Alias of the race'},
+			status:			'stable',
+			version:		1.3,
 			callback:		function(params, req, res, callback) {
 				
 				

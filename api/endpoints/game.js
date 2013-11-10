@@ -250,6 +250,10 @@ api.prototype.init = function(Gamify, callback){
 							live:		true
 						}
 					}, function(response) {
+						if (response.length == 0) {
+							callback(Gamify.api.errorResponse("The game token provided is invalid."));
+							return false;
+						}
 						//console.log("\033[35m response:\033[37m",response);
 						var results = response[0].result;
 						var maxtime = response[0].maxtime;

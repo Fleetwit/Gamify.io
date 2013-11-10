@@ -23,54 +23,70 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
-				request.get('http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='+escape(params.location), function (error, response, body) {
+				var url;
+				if (typeof params.location == "object") {
+					url = 'http://maps.googleapis.com/maps/api/geocode/json?sensor=false&latlng='+escape(params.location.lat)+","+escape(params.location.lng);
+				} else {
+					url = 'http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='+params.location;
+				}
+				console.log("\033[35m url:\033[37m",url);
+				
+				request.get(url, function (error, response, body) {
 					
 					if (!error && response.statusCode == 200) {
 						var data 	= JSON.parse(body);
 						
-						data 		= data.results[0];
+						console.log("data",JSON.stringify(data,null,4));
 						
-						var keys = {
-							postal_code:					"zipcode",
-							locality:						"city",
-							administrative_area_level_1:	"state",
-							country:						"country"
-						};
-						var i;
-						var j;
-						var output = {
-							levels:		{},
-							address:	data.formatted_address,
-							gps:		{
-								lat: 	data.geometry.location.lat,
-								lng: 	data.geometry.location.lng
-							},
-							geojson:	{
-								type:			"point",
-								coordinates:	[data.geometry.location.lng, data.geometry.location.lat]
-							}
-						};
-						for (i in data.address_components) {
-							for (j in data.address_components[i].types) {
-								if (keys[data.address_components[i].types[j]]) {
-									output.levels[keys[data.address_components[i].types[j]]] = data.address_components[i].short_name;
+						if (data.results.length == 0) {
+							callback(Gamify.api.errorResponse("The location \""+params.location+"\" is invalid."));
+						} else {
+							
+							data 		= data.results[0];
+							
+							var keys = {
+								postal_code:					"zipcode",
+								locality:						"city",
+								administrative_area_level_1:	"state",
+								country:						"country"
+							};
+							var i;
+							var j;
+							var output = {
+								levels:		{},
+								address:	data.formatted_address?data.formatted_address:false,
+								gps:		{
+									lat: 	data.geometry.location.lat,
+									lng: 	data.geometry.location.lng
+								},
+								geojson:	{
+									type:			"point",
+									coordinates:	[data.geometry.location.lng, data.geometry.location.lat]
+								}
+							};
+							for (i in data.address_components) {
+								for (j in data.address_components[i].types) {
+									if (keys[data.address_components[i].types[j]]) {
+										output.levels[keys[data.address_components[i].types[j]]] = data.address_components[i].short_name;
+									}
 								}
 							}
-						}
-						
-						// Get the timezone now
-						// "https://maps.googleapis.com/maps/api/timezone/json?location=".$output["lat"].",".$output["lng"]."&timestamp=".time()."&sensor=false"
-						request.get('https://maps.googleapis.com/maps/api/timezone/json?location='+data.geometry.location.lat+","+data.geometry.location.lng+"&timestamp="+Math.round(new Date().getTime()/1000)+"&sensor=false", function (error, response, body) {
 							
-							if (!error && response.statusCode == 200) {
-								var data 	= JSON.parse(body);
+							output.public	= output.levels.city+", "+output.levels.state+" ("+output.levels.country+")"
+							
+							// Get the timezone now
+							// "https://maps.googleapis.com/maps/api/timezone/json?location=".$output["lat"].",".$output["lng"]."&timestamp=".time()."&sensor=false"
+							request.get('https://maps.googleapis.com/maps/api/timezone/json?location='+data.geometry.location.lat+","+data.geometry.location.lng+"&timestamp="+Math.round(new Date().getTime()/1000)+"&sensor=false", function (error, response, body) {
 								
-								output.timezone	= data.timeZoneId;
-								
-								callback(output);
-							}
-						});
-						
+								if (!error && response.statusCode == 200) {
+									var data 	= JSON.parse(body);
+									
+									output.timezone	= data.timeZoneId;
+									
+									callback(output);
+								}
+							});
+						}
 					}
 				});
 			}

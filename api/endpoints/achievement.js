@@ -73,14 +73,23 @@ api.prototype.init = function(Gamify, callback){
 					// Can we earn this achievement more than once?
 					var multi 	= response[0].multi;
 					
+					console.log("\033[35m unlock multi("+params.alias+"):\033[37m",multi);
+					
 					// Does the user has this already?
 					scope.mongo.count({
 						collection:		scope.collections.general,
-						data:			{
+						query:			{
 							alias:	params.alias,
 							uid:	params.user.uid
 						}
 					}, function(count) {
+						console.log("\033[35m unlock count ("+params.alias+"):\033[37m",count,JSON.stringify({
+							collection:		scope.collections.general,
+							query:			{
+								alias:	params.alias,
+								uid:	params.user.uid
+							}
+						},null,4));
 						if (count == 0) {
 							// User doesn't have that achievement yet
 							// Let's create the achievement

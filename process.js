@@ -43,7 +43,7 @@ if ('dev' == app.get('env')) {
 Gamify.settings.db 					= "dev";
 Gamify.settings.systoken 			= "sys540f40c9968814199ec7ca847ec45";
 Gamify.settings.max_min_late		= 10;		// min
-Gamify.settings.default_race_time	= 15000;	// ms
+Gamify.settings.default_race_time	= 1000;		// ms
 
 Gamify.api.init(function() {
 	console.log("API mapped. Starting server...");
@@ -64,6 +64,7 @@ var apiRoute = function(req, res) {
 			data.params = _.extend({},JSON.parse(data.params));	// get means we need to parse
 		} catch(e) {}
 	}
+	console.log("\033[35m data(params):\033[37m",data);
 	// Fix the types
 	var i;
 	for (i in data) {

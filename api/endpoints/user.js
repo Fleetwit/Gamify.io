@@ -347,9 +347,9 @@ api.prototype.init = function(Gamify, callback){
 					for (i=0;i<l;i++) {
 						response[i].fullname = response[i].firstname+" "+response[i].lastname;
 						response[i].state = {
-							gender:		!(!response[i].metadata || !response[i].metadata.gender),
-							age:		!(!response[i].metadata || !response[i].metadata.age),
-							location:	!(!response[i].metadata || !response[i].metadata.location),
+							gender:		!(!response[i].metadatas || !response[i].metadatas.gender),
+							age:		!(!response[i].metadatas || !response[i].metadatas.age),
+							location:	!(!response[i].location),
 							facebook:	!(!response[i].fbuid)
 						};
 					}
@@ -380,6 +380,13 @@ api.prototype.init = function(Gamify, callback){
 					if (response.length == 0) {
 						callback(false);
 					} else {
+						response[0].fullname = response[0].firstname+" "+response[0].lastname;
+						response[0].state = {
+							gender:		!(!response[0].metadatas || !response[0].metadatas.gender),
+							age:		!(!response[0].metadatas || !response[0].metadatas.age),
+							location:	!(!response[0].location),
+							facebook:	!(!response[0].fbuid)
+						};
 						callback(response[0]);
 					}
 				});
@@ -411,14 +418,20 @@ api.prototype.init = function(Gamify, callback){
 					var prevParam		= _.extend({},params);
 					prevParam.page		= response.pagination.current-1;
 					
+					console.log("\033[35m Paginate query:\033[37m",JSON.stringify(_.extend({
+					collection:	"users",
+					query:		{}
+				}, params),null,4));
+					console.log("\033[35m response:\033[37m",JSON.stringify(response,null,4));
+					
 					var i;
 					var l = response.data.length;
 					for (i=0;i<l;i++) {
 						response.data[i].fullname = response.data[i].firstname+" "+response.data[i].lastname;
 						response.data[i].state = {
-							gender:		!(!response.data[i].metadata || !response.data[i].metadata.gender),
-							age:		!(!response.data[i].metadata || !response.data[i].metadata.age),
-							location:	!(!response.data[i].metadata || !response.data[i].metadata.location),
+							gender:		!(!response.data[i].metadatas || !response.data[i].metadatas.gender),
+							age:		!(!response.data[i].metadatas || !response.data[i].metadatas.age),
+							location:	!(!response.data[i].location),
 							facebook:	!(!response.data[i].fbuid)
 						};
 					}
@@ -474,7 +487,7 @@ api.prototype.init = function(Gamify, callback){
 		
 		setLocation: {
 			require:		['location'],
-			params:			{},
+			params:			{location:"String"},
 			auth:			"authtoken",
 			description:	"Set a user's location, in natural language. Example: 'Soho, New York City'. The location is geo-encoded and added to the user's meta-datas.",
 			status:			'stable',
@@ -504,6 +517,17 @@ api.prototype.init = function(Gamify, callback){
 						}
 					}, function() {
 						callback(response);
+						
+						// Give the achievement
+						Gamify.api.execute("achievement","unlock", {
+							authtoken:		scope.Gamify.settings.systoken,
+							user:	{
+								uid:		params.__auth
+							},
+							alias:	"location"
+						}, function(unlocked_done) {
+							console.log("\033[35m [>location]:\033[37m",unlocked_done);
+						});
 					});
 				});
 				
@@ -532,6 +556,150 @@ api.prototype.init = function(Gamify, callback){
 				}, function() {
 					callback({set:true});
 				});
+				
+			}
+		},
+		
+		
+		
+		
+		update: {
+			require:		[],
+			params:			{},
+			auth:			"authtoken",
+			description:	"Update the user's profile.",
+			status:			'stable',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				//console.log("\033[35m BEFORE:\033[37m",params);
+				
+				params = Gamify.api.filter(params, ['authtoken','__auth','gender','email','dob','location']);
+				
+				var stack 			= new Gamify.stack();
+				var updateQuery 	= {};
+				var metaQuery 		= {};
+				
+				var age		= function(timestamp) {
+					var birthDate = new Date(timestamp*1000);
+					var now = new Date();
+					
+					var isLeap = function (year) {
+						return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+					}
+					
+					// days since the birthdate
+					var days = Math.floor((now.getTime() - birthDate.getTime())/1000/60/60/24);
+					var age = 0;
+					// iterate the years
+					for (var y = birthDate.getFullYear(); y <= now.getFullYear(); y++){
+						var daysInYear = isLeap(y) ? 366 : 365;
+						if (days >= daysInYear){
+							days -= daysInYear;
+							age++;
+							// increment the age only if there are available enough days for the year.
+						}
+					}
+					return age;
+				}
+				
+				var agerange = function(age) {
+					var ranges = {
+						"0-13":		[0,13],
+						"14-18":	[14,18],
+						"18-25":	[18,25],
+						"25-35":	[25,35],
+						"35-45":	[35,45],
+						"45-55":	[45,55],
+						"55-65":	[55,65],
+						"65+":		[65,150]
+					};
+					var range;
+					for (range in ranges) {
+						if (age >= ranges[range][0] && age <= ranges[range][1]) {
+							return range;
+						}
+					}
+				}
+				
+				var item;
+				for (label in params) {
+					switch (label) {
+						case "gender":
+							updateQuery['gender'] 	= params['gender'];
+							metaQuery['gender'] 	= params['gender']==1?'male':'female';
+						break;
+						case "email":
+							updateQuery['email'] 	= params['email'];
+						break;
+						case "dob":
+							updateQuery['dob'] 		= params['dob'];
+							metaQuery['age'] 		= age(params['dob']);
+							metaQuery['agerange'] 	= agerange(age(params['dob']));
+						break;
+						case "location":
+							stack.add(function(p, onProcessed) {
+								scope.Gamify.api.execute("user","setLocation", {
+									authtoken:		params.authtoken,
+									__auth:			params.__auth,
+									__authcheck:	Gamify.settings.systoken,
+									location:params['location']
+								}, onProcessed);
+							},{});
+						break;
+					}
+				}
+				
+				stack.add(function(p, onProcessed) {
+					scope.Gamify.api.execute("user","set", {
+						authtoken:	Gamify.settings.systoken,
+						query:		{
+							uid:	params.__auth
+						},
+						data:	updateQuery
+					}, onProcessed);
+				},{});
+					
+				stack.add(function(p, onProcessed) {
+					scope.Gamify.api.execute("user","setMetas", {
+						authtoken:		params.authtoken,
+						__auth:			params.__auth,
+						__authcheck:	Gamify.settings.systoken,
+						data:			metaQuery
+					}, onProcessed);
+				},{});
+				
+				stack.process(function() {
+					callback({updated:true,data:updateQuery});
+					
+					// Background
+					// Check the current state of the user:
+					
+					// Give the achievement
+					Gamify.api.execute("user","get", {
+						authtoken:		params.authtoken,
+						__auth:			params.__auth,
+						__authcheck:	Gamify.settings.systoken
+					}, function(user) {
+						console.log("\033[35m USER STATE:\033[37m",JSON.stringify(user,null,4));
+						
+						if (user && user.state && user.state.gender && user.state.location && user.state.age) {
+							// Give the achievement
+							Gamify.api.execute("achievement","unlock", {
+								authtoken:		Gamify.settings.systoken,
+								user:	{
+									uid:		params.__auth
+								},
+								alias:	"completed_profile"
+							}, function(unlocked_done) {
+								console.log("\033[35m [>completed_profile]:\033[37m",unlocked_done);
+							});
+						}
+					});
+					
+					
+						
+				}, false);	//not async
 				
 			}
 		},
@@ -789,14 +957,56 @@ api.prototype.init = function(Gamify, callback){
 				
 				scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true,fbfriends:true}}, function(user) {
 					
-					
-					scope.Gamify.api.execute("user","paginate", {
-						query:		{
-							fbuid:		{
-								$in:	user.fbfriends
+					if (user.fbfriends) {
+						scope.Gamify.api.execute("user","paginate", {
+							query:		{
+								fbuid:		{
+									$in:	user.fbfriends
+								}
 							}
-						}
-					}, callback);
+						}, function(response) {
+							callback(response);
+							
+							// Background - unlock the achievements
+							
+							if (response.pagination.total >= 20) {
+								Gamify.api.execute("achievement","unlock", {
+									authtoken:		Gamify.settings.systoken,
+									user:	{
+										uid:		params.__auth
+									},
+									alias:	"friend_20"
+								}, function(unlocked_done) {
+									console.log("\033[35m [>friend_20]:\033[37m",unlocked_done);
+								});
+							}
+							if (response.pagination.total >= 10) {
+								Gamify.api.execute("achievement","unlock", {
+									authtoken:		Gamify.settings.systoken,
+									user:	{
+										uid:		params.__auth
+									},
+									alias:	"friend_10"
+								}, function(unlocked_done) {
+									console.log("\033[35m [>friend_10]:\033[37m",unlocked_done);
+								});
+							}
+							if (response.pagination.total >= 1) {
+								Gamify.api.execute("achievement","unlock", {
+									authtoken:		Gamify.settings.systoken,
+									user:	{
+										uid:		params.__auth
+									},
+									alias:	"friend_1"
+								}, function(unlocked_done) {
+									console.log("\033[35m [>friend_1]:\033[37m",unlocked_done);
+								});
+							}
+						});
+						
+					} else {
+						callback({pagination:{total:0},data:[]});
+					}
 				});
 				
 			}
@@ -814,41 +1024,76 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
-				// Get the user's metas
-				scope.mongo.find({
-					collection:	"users",
-					query:		{
-						uid:	params.__auth
-					},
-					limit:		1,
-					fields:		{
-						metadatas:	true
-					}
-				}, function(response) {
-					
-					//console.log("response",response);
-					
-					if (!response || response.length == 0) {
-						callback(scope.Gamify.api.errorResponse('This user doesn\'t exist.'));
-					} else {
-						var metas = {};
-						if (response[0] && response[0].metadatas) {
-							metas = response[0].metadatas;
+				
+				
+				
+				var logCreate = function() {
+					// Get the user's metas
+					scope.mongo.find({
+						collection:	"users",
+						query:		{
+							uid:	params.__auth
+						},
+						limit:		1,
+						fields:		{
+							metadatas:	true
 						}
+					}, function(response) {
 						
-						// Now we log the action
-						scope.mongo.insert({
-							collection:		"userlogs",
-							data:			_.extend({
-								date:			new Date(),
-								uid:			params.__auth,
-								metas:			metas
-							},params.data)
-						}, function() {
-							callback({logged: true});
+						if (!response || response.length == 0) {
+							callback(scope.Gamify.api.errorResponse('This user doesn\'t exist.'));
+						} else {
+							var metas = {};
+							if (response[0] && response[0].metadatas) {
+								metas = response[0].metadatas;
+							}
+							
+							// Now we log the action
+							scope.mongo.insert({
+								collection:		"userlogs",
+								data:			_.extend({
+									date:			new Date(),
+									uid:			params.__auth,
+									metas:			metas
+								},params.data)
+							}, function() {
+								callback({logged: true,isnew:true});
+							});
+						}
+					});
+				};
+				
+				
+				
+				
+				if (params.action == "race.register") {
+					// Check if ther user is already registered
+					scope.Gamify.api.execute("race","is_registered", {
+						authtoken:		params.authtoken,
+						__auth:			params.__auth,
+						__authcheck:	scope.Gamify.settings.systoken,
+						race:			params.race
+					}, function(user) {
+						
+						
+						scope.Gamify.api.execute("user","paginate", {
+							query:		{
+								fbuid:		{
+									$in:	user.fbfriends
+								}
+							}
+						}, function(status) {
+							if (!status.registered) {
+								logCreate();
+							} else {
+								callback({logged: true});
+							}
 						});
-					}
-				});
+					});
+				} else {
+					logCreate();
+				}
+				
 			}
 		},
 	};
