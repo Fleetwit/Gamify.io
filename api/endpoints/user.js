@@ -132,6 +132,11 @@ api.prototype.init = function(Gamify, callback){
 					password:	'md5'
 				});
 				
+				params.data = _.extend({
+					reminder_text:	true,
+					reminder_email:	true
+				},params.data);
+				
 				// Account Creation method
 				var create_account = function() {
 					var uid = scope.Gamify.crypto.md5(scope.Gamify.uuid.v4());
@@ -295,9 +300,10 @@ api.prototype.init = function(Gamify, callback){
 										lastname:	data.last_name,
 										fbfriends:	friends
 									};
-									if (data.birthday) {
+									//@TODO: Fix DOB, export the age/agerange methods as services
+									/*if (data.birthday) {
 										userQuery.dob	= moment(data.birthday, "MM/DD/YYYY").toDate();
-									}
+									}*/
 									scope.Gamify.api.execute("user","create", {
 										data:			userQuery
 									}, function(response) {
@@ -352,6 +358,9 @@ api.prototype.init = function(Gamify, callback){
 							location:	!(!response[i].location),
 							facebook:	!(!response[i].fbuid)
 						};
+						if (!response[i].avatar) {
+							response[i].avatar = "images/avatar-default.png";
+						}
 					}
 					callback(response);
 				});
@@ -387,6 +396,9 @@ api.prototype.init = function(Gamify, callback){
 							location:	!(!response[0].location),
 							facebook:	!(!response[0].fbuid)
 						};
+						if (!response[0].avatar) {
+							response[0].avatar = "images/avatar-default.png";
+						}
 						callback(response[0]);
 					}
 				});
@@ -574,7 +586,7 @@ api.prototype.init = function(Gamify, callback){
 				
 				//console.log("\033[35m BEFORE:\033[37m",params);
 				
-				params = Gamify.api.filter(params, ['authtoken','__auth','gender','email','dob','location']);
+				params = Gamify.api.filter(params, ['authtoken','__auth','gender','email','dob','location','phone','reminder_text','reminder_email','avatar']);
 				
 				var stack 			= new Gamify.stack();
 				var updateQuery 	= {};
@@ -625,6 +637,12 @@ api.prototype.init = function(Gamify, callback){
 				var item;
 				for (label in params) {
 					switch (label) {
+						case "phone":
+						case "reminder_text":
+						case "reminder_email":
+						case "avatar":
+							updateQuery[label] 	= params[label];
+						break;
 						case "gender":
 							updateQuery['gender'] 	= params['gender'];
 							metaQuery['gender'] 	= params['gender']==1?'male':'female';
