@@ -478,19 +478,19 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		ranking: {
-			require:		['game'],
+			require:		['race'],
 			auth:			false,
 			description:	"Returns the ranking for a game, paginated. Only game sessions ended using game.end will appear.",
-			params:			{game:"string - Game ID"},
+			params:			{race:"Race alias"},
 			status:			'stable',
-			version:		1,
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
 				
 				scope.mongo.paginate(_.extend(params,{
 					collection:	scope.collections.scores,
 					query:		{
-						game:	params.game,
+						race:	params.race,
 						ended:	{
 							$ne:	false
 						}
@@ -504,9 +504,33 @@ api.prototype.init = function(Gamify, callback){
 					var prevParam		= _.extend({},params);
 					prevParam.page		= response.pagination.current-1;
 					
-					response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
-					response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
-					callback(response);
+					// Get the uids
+					var uids = [];
+					var i;
+					var l = response.data.length;
+					for (i=0;i<l;i++) {
+						uids.push(response.data[i].uid);
+					}
+					scope.Gamify.api.execute("user","find", {
+						query:	 {
+							uid:	 {
+								$in: 	uids
+							}
+						}
+					}, function(users) {
+						users = Gamify.utils.indexed(users, "uid");
+						
+						for (i=0;i<l;i++) {
+							response.data[i].user = users[response.data[i].uid];
+						}
+						
+						
+						response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
+						response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
+						callback(response);
+						
+					});
+					
 				});
 			}
 		},

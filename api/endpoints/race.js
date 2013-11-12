@@ -526,6 +526,57 @@ api.prototype.init = function(Gamify, callback){
 					
 				});
 			}
+		},
+		
+		
+		get_registered: {
+			require:		['race'],
+			auth:			false,
+			description:	"Check if the user is registered to the race.",
+			params:			{race:'Alias of the race'},
+			status:			'stable',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				// Get the count
+				scope.mongo.count({
+					collection:	'userlogs',
+					query:		{
+						race:	params.race
+					}
+				}, function(count) {
+					
+					// Get the uids
+					scope.mongo.find({
+						collection:	'userlogs',
+						query:		{
+							race:	params.race
+						},
+						fields:		{
+							uid:	true,
+							_id:	false
+						}
+					}, function(registrations) {
+						var uids = [];
+						var i;
+						var l = registrations.length;
+						for (i=0;i<l;i++) {
+							uids.push(registrations[i].uid);
+						}
+						// Paginate the users
+						scope.Gamify.api.execute("user","paginate", {query: {uid: {$in: uids}}, authtoken: Gamify.settings.systoken}, function(response) {
+							callback({
+								data:		response.data,
+								pagination:	{
+									total:	count
+								}
+							});
+						});
+					});
+					
+				});
+
+			}
 		}
 		
 	};

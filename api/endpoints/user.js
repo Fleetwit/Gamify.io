@@ -333,7 +333,7 @@ api.prototype.init = function(Gamify, callback){
 		
 		find: {
 			require:		[],
-			params:			{},
+			params:			{query:"MongoDB query"},
 			auth:			false,
 			description:	"Search for users. Returns only the public informations.",
 			status:			'unstable',
