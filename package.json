@@ -9,7 +9,8 @@
 		"request":		"latest",
 		"facebook-api":	"latest",
 		"twig": 		"*",
-		"moment":		"latest"
+		"moment":		"latest",
+		"mysql":		"latest"
 	}
 }
 

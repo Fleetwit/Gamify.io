@@ -128,9 +128,13 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
-				params.data	= scope.Gamify.api.fixTypes(params.data, {
-					password:	'md5'
-				});
+				if (!params.__passwordencoded) {
+					params.data	= scope.Gamify.api.fixTypes(params.data, {
+						password:	'md5'
+					});
+					
+				}
+				
 				
 				params.data = _.extend({
 					reminder_text:	true,
@@ -142,7 +146,8 @@ api.prototype.init = function(Gamify, callback){
 					var uid = scope.Gamify.crypto.md5(scope.Gamify.uuid.v4());
 					
 					var userdata = _.extend({
-						avatar:		"images/avatar-default.png"
+						avatar:			"images/avatar-default.png",
+						register_date:	new Date()
 					},params.data, {
 						uid:		uid
 					});
@@ -184,7 +189,7 @@ api.prototype.init = function(Gamify, callback){
 					query:			query
 				}, function(count) {
 					if (count > 0) {
-						callback(scope.Gamify.api.errorResponse('This account is already in use.'));
+						callback(scope.Gamify.api.errorResponse('This account is already in use.',304));
 					} else {
 						create_account();
 					}

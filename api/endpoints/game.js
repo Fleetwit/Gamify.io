@@ -72,7 +72,7 @@ api.prototype.init = function(Gamify, callback){
 						// live race? Make sure you are not too late
 						if (params.live == true) {
 							// If you're too late, you can't play!
-							if (race_starts_in < (Gamify.settings.max_min_late*60*1000)*-1) {
+							if (race_starts_in < (Gamify.settings.max_min_late*60*1000)*-1 && !params.force_entry) {	// param "force_entry" allows to play an expired live race.
 								can_play = false;
 							}
 							starts_in 			= race_starts_in;
@@ -98,7 +98,8 @@ api.prototype.init = function(Gamify, callback){
 							started:	false,
 							ended:		false,
 							token:		can_play?token:false,		// Game token, used to submit scores
-							scores:	[],
+							scores:		[],
+							imported:	params.imported?true:false,
 							result:	{
 								score:		0,
 								time:		0,
@@ -259,7 +260,7 @@ api.prototype.init = function(Gamify, callback){
 						var maxtime = response[0].maxtime;
 						
 						// Now we calculate the time multiplier
-						if (response[0].late) {
+						if (response[0].late && !response[0].imported) {
 							// User was late. We need to deduce that time from their score...
 							var multiplier	= (1 - (Math.max((results.time+response[0].snapshot), maxtime)/maxtime)) + 1;	// max() is there to not have negative multipliers
 						} else {
@@ -481,9 +482,9 @@ api.prototype.init = function(Gamify, callback){
 			require:		['race'],
 			auth:			false,
 			description:	"Returns the ranking for a game, paginated. Only game sessions ended using game.end will appear.",
-			params:			{race:"Race alias"},
+			params:			{race:"Race alias",live:"Bool - live race - Default: <code>false</code>"},
 			status:			'stable',
-			version:		1.2,
+			version:		1.4,
 			callback:		function(params, req, res, callback) {
 				
 				
@@ -491,6 +492,10 @@ api.prototype.init = function(Gamify, callback){
 					collection:	scope.collections.scores,
 					query:		{
 						race:	params.race,
+						live:	params.live?true:false,
+						'result.total': {
+							$gt: 0
+						},
 						ended:	{
 							$ne:	false
 						}

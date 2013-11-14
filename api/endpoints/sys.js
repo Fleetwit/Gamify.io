@@ -125,6 +125,404 @@ api.prototype.init = function(Gamify, callback){
 
 				
 			}
+		},
+		
+		
+		
+		
+		
+		
+		test: {
+			require:		[],
+			auth:			false,
+			description:	"",
+			params:			{},
+			status:			'dev',
+			version:		0.1,
+			callback:		function(params, req, res, callback) {
+				
+				var data = [{
+					color:	"red",
+					type:	"fruit",
+					name:	"strawberry"
+				},{
+					color:	"red",
+					type:	"veg",
+					name:	"tomatoe"
+				},{
+					color:	"red",
+					type:	"fruit",
+					name:	"Berry"
+				},{
+					color:	"yellow",
+					type:	"fruit",
+					name:	"Banana"
+				},{
+					color:	"yellow",
+					type:	"vegetable",
+					name:	"Yellow Pepper"
+				},{
+					color:	"yellow",
+					type:	"vegetable",
+					name:	"Yellow Cabbage"
+				},{
+					color:	"green",
+					type:	"fruit",
+					name:	"Green Nuts"
+				}];
+				
+				
+				callback(Gamify.utils.group(data, ["type","color"]));
+			}
+		},
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		importUsers: {
+			require:		[],
+			auth:			'sys',
+			description:	"Import the users from the old Fleetwit database to the new one (currently '"+Gamify.settings.db+"')",
+			params:			{},
+			status:			'unstable',
+			version:		1.2,
+			callback:		function(params, req, res, callback) {
+				
+				var notfound = [];
+				var __stats = {
+					imported:	0,
+					duplicates:	[]
+				};
+				
+				var removeList = ["users","scores","achievements","userlogs","authtokens","challenges","fbinvites"];
+				
+				// Reset the data
+				var removeStack = new Gamify.stack();
+				_.each(removeList, function(item) {
+					removeStack.add(function(params, onProcessed) {
+						scope.mongo.remove({
+							collection:	item
+						}, function() {
+							onProcessed();
+						});
+					});
+				});
+				
+				removeStack.process(function() {
+					// Import the users
+					scope.mongo_old.find({
+						collection:	'datastore',
+						query:		{
+							//uid:	9
+						},
+						//limit:		5
+					}, function(oldusers) {
+						
+						var importStack = new Gamify.stack();
+						_.each(oldusers, function(olduser) {
+							
+							// Add each user import op to a new layer in the stack
+							importStack.add(function(params, onProcessed) {
+								
+								// Get the user's SQL data
+								Gamify.sql.query("select * from users where id="+params.olduser.uid, function(err, rows, fields) {
+									if (!err && rows.length > 0 && rows[0].id > 0) {
+										// extend the user's local data
+										params.olduser.sql = rows[0];
+										
+										
+										// Import Ops
+										// Dedicated sub-stack
+										var opStack = new Gamify.stack();
+										
+										// Create the user
+										opStack.add(function(params2, onProcessed) {
+											var userData = {
+												register_date:	 new Date(params.olduser.sql.register_date*1000),
+												firstname:		params.olduser.sql.firstname,
+												lastname:		params.olduser.sql.lastname,
+												email:			params.olduser.sql.email
+											};
+											// Add the facebook id
+											if (params.olduser.sql.uid > 0) {
+												userData.fbuid = params.olduser.sql.uid;
+											}
+											// Add the password
+											if (params.olduser.sql.password && params.olduser.sql.password != "") {
+												userData.password = params.olduser.sql.password;
+											}
+											// Add the phone
+											if (params.olduser.sql.phone && params.olduser.sql.phone != "Phone number" && params.olduser.sql.phone != "") {
+												userData.phone = params.olduser.sql.phone;
+											}
+											// Add the avatar
+											if (params.olduser.sql.avatar && params.olduser.sql.avatar != "") {
+												userData.avatar = params.olduser.sql.avatar_large;
+											}
+											
+											
+											// Create the user
+											scope.Gamify.api.execute("user","create", {data:userData, __passwordencoded:true}, function(response) {
+												
+												// Error? Duplicate account?
+												if (response.error && response.error.number == 304) {	// already exist
+													// Merge the account
+													// Find the account
+													var searchQuery;
+													if (userData.email && userData.fbuid) {
+														searchQuery = {
+															$or:	[
+																{email:	userData.email},
+																{fbuid:	userData.fbuid},
+															]
+														};
+													} else if (userData.email && !userData.fbuid) {
+														searchQuery = {
+															email:	userData.email
+														};
+													} else if (!userData.email && userData.fbuid) {
+														searchQuery = {
+															fbuid:	userData.fbuid
+														};
+													}
+													
+													scope.mongo.find({
+														collection:	'users',
+														query:		searchQuery
+													}, function(queryResponse) {
+														if (queryResponse.length > 0) {
+															// Save the uid of the duplicate account, we'll merge the info later
+															params.olduser.mergedwith = queryResponse[0].uid;
+														} else {
+															console.log("\033[35m Creating user [ERROR] [response]:\033[37m","Duplicate user not found.");
+														}
+													});
+													__stats.duplicates.push(searchQuery);
+												} else {
+													__stats.imported++;
+												}
+												
+												console.log("\033[35m [Response] [response]:\033[37m",response);
+												params.olduser.authtoken	= response.authtoken;
+												params.olduser.uuid			= response.user;
+												onProcessed();
+											});
+										}, {});
+										
+										
+										// Update the user (to give achievements)
+										opStack.add(function(params2, onProcessed) {
+											var userData = {};
+											
+											// Add the gender
+											if (params.olduser.sql.gender && params.olduser.sql.gender > 0) {
+												userData.gender 	= params.olduser.sql.gender;
+											}
+											// Add the dob
+											if (params.olduser.sql.dob && params.olduser.sql.dob > 0) {
+												userData.dob 	= params.olduser.sql.dob;
+											}
+											// Add the location
+											if (params.olduser.sql.city && params.olduser.sql.city != "") {
+												userData.location 	= params.olduser.sql.location;
+											}
+											// ... location: Better data if available
+											if (params.olduser.publicdata && params.olduser.publicdata.location) {
+												userData.location 	= params.olduser.publicdata.location.city+", "+params.olduser.publicdata.location.state+" "+params.olduser.publicdata.location.country;
+											}
+											// Add the timezone
+											if (params.olduser.sql.timezone && params.olduser.sql.timezone != "") {
+												userData.timezone 	= params.olduser.sql.timezone;
+											}
+											userData.authtoken		= params.olduser.authtoken;
+											userData.__auth 		= params.olduser.uuid;
+											userData.__authcheck	= Gamify.settings.systoken;
+											
+											// Update the user
+											scope.Gamify.api.execute("user","update", userData, function(response) {
+												
+												onProcessed();
+											});
+										}, {});
+										
+										
+										// Register the user to his races
+										opStack.add(function(params2, onProcessed) {
+											if (params.olduser.racedata && params.olduser.racedata.length > 0) {
+												
+												// Group the data
+												//var groupedData = Gamify.utils.group(params.olduser.racedata, ["race","level"]);
+												
+												
+												var groupedData = _.groupBy(params.olduser.racedata, function(item) {
+													return item["race"];
+												});
+												
+												var i;
+												for (i in groupedData) {
+													groupedData[i] = _.groupBy(groupedData[i], function(subitem) {
+														return subitem["level"];
+													});
+												}
+												
+												console.log("\033[35m [groupedData]:\033[37m",groupedData);
+												
+												
+												
+												_.each(params.olduser.racedata, function(racereg) {
+													if (racereg.type && racereg.type == "registration") {
+														// Register for the race
+														scope.Gamify.api.execute("user","log", {
+															authtoken:		params.olduser.authtoken,
+															__auth:			params.olduser.uuid,
+															__authcheck:	Gamify.settings.systoken,
+															action:			"race.register",
+															race:			Gamify.data.oldraces.getByUuid(racereg.race).alias
+														}, function(response) {
+															
+															onProcessed();
+														});
+													} else if (racereg.type && racereg.type == "data" && racereg.level*1 == 0) {
+														// Start a new game
+														scope.Gamify.api.execute("game","register", {
+															authtoken:		params.olduser.authtoken,
+															__auth:			params.olduser.uuid,
+															__authcheck:	Gamify.settings.systoken,
+															alias:			Gamify.data.oldraces.getByUuid(racereg.race).alias,
+															live:			true,
+															force_entry:	true,	// Force the race to start (because the live race is expired)
+															imported:		true
+														}, function(game_response) {
+															if (game_response.token) {
+																
+																// Start the race
+																scope.Gamify.api.execute("game","start", {
+																	authtoken:		params.olduser.authtoken,
+																	__auth:			params.olduser.uuid,
+																	__authcheck:	Gamify.settings.systoken,
+																	token:			game_response.token
+																}, function(start_response) {
+																	
+																	
+																	
+																	
+																	var subopStack = new Gamify.stack();
+																	
+																	
+																	
+																	if (groupedData[racereg.race]) {
+																		var levels = groupedData[racereg.race];
+																		for (level in levels) {
+																			
+																			if (level*1 > 0) {
+																				subopStack.add(function(params3, onProcessed) {
+																					console.log("processing params3.level #"+params3.level, JSON.stringify(params3.levels[params3.level], null, 4));
+																					if (params3.levels[params3.level][0].data) {
+																						console.log("#"+params3.level+" -> Step 1");
+																						try {
+																							
+																							scope.Gamify.api.execute("game","sendscore", {
+																								authtoken:		params.olduser.authtoken,
+																								__auth:			params.olduser.uuid,
+																								__authcheck:	Gamify.settings.systoken,
+																								token:			game_response.token,
+																								level:			params3.level*1,
+																								score:			params3.levels[params3.level][0].data.rawscore,
+																								time:			params3.levels[params3.level][0].data.ms,
+																								sent:			"import",
+																								data:			params3.levels[params3.level][0].data
+																							}, function(game_response) {
+																								onProcessed()
+																							});
+																						} catch(e) {
+																							console.log("\033[35m [ERROR]:\033[37m",params3.levels[params3.level][0]);
+																						}
+																					} else if (params3.levels[params3.level][0].rawscore && params3.levels[params3.level][0].ms) {
+																						console.log("#"+params3.level+" -> Step 2");
+																						try {
+																							scope.Gamify.api.execute("game","sendscore", {
+																								authtoken:		params.olduser.authtoken,
+																								__auth:			params.olduser.uuid,
+																								__authcheck:	Gamify.settings.systoken,
+																								token:			game_response.token,
+																								score:			params3.levels[params3.level][0].rawscore,
+																								time:			params3.levels[params3.level][0].ms,
+																								sent:			"import",
+																								data:			(params3.levels[params3.level][0].data )?params3.levels[params3.level][0].data:{}
+																							}, function(game_response) {
+																								onProcessed()
+																							});
+																						} catch(e) {
+																							console.log("\033[35m [ERROR]:\033[37m",params3.levels[params3.level][0]);
+																						}
+																					} else {
+																						console.log("#"+params3.level+" -> FAILED");
+																						onProcessed()
+																					}
+																				},{level:level,levels:levels});
+																			}
+																		}
+																		
+																		subopStack.process(function() {
+																			// End the game
+																			scope.Gamify.api.execute("game","end", {
+																				authtoken:		params.olduser.authtoken,
+																				__auth:			params.olduser.uuid,
+																				__authcheck:	Gamify.settings.systoken,
+																				token:			game_response.token
+																			}, function(game_response) {
+																				onProcessed();
+																			});
+																		}, false);	// Sync
+																		
+																		
+																	} else {
+																		// race not found
+																	}
+																	
+																});
+																
+																
+															}
+															// -> onProcessed();
+														});
+													}
+													// ignore the rest, we'll process in order
+												});
+											}
+										}, {});
+										
+										opStack.process(function() {
+											onProcessed();
+										}, false);	// Sync
+									} else {
+										console.log("USER NOT FOUND: #",params.olduser.uid);
+										notfound.push(params.olduser.uid);
+									}
+								});
+								
+							},{olduser: olduser});
+						});
+						
+						
+						importStack.process(function() {
+							console.log("Finished.",__stats);
+							callback(__stats);
+						}, true);	// Async
+						
+					});
+				}, true);	// async, order doesn't matter
+				
+				
+				
+				
+			}
 		}
 		
 	};

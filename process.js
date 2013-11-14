@@ -1,6 +1,7 @@
 /**
 * Module dependencies.
 */
+var mysql		= require('mysql');
 var _ 			= require('underscore');
 var Twig 		= require("twig");
 var express 	= require('express');
@@ -9,9 +10,11 @@ var path 		= require('path');
 var Gamify 		= require("Gamify.io");
 
 var options = _.extend({
+	online:		true,
 	env:		"dev",
 	debug_mode:	false,
-	port:		8080
+	port:		8080,
+	mysql:		false
 },processArgs());
 
 var app = express();
@@ -40,19 +43,53 @@ if ('dev' == app.get('env')) {
 }
 
 
-Gamify.settings.db 					= "dev";
-Gamify.settings.systoken 			= "sys540f40c9968814199ec7ca847ec45";
-Gamify.settings.max_min_late		= 10;		// min
-Gamify.settings.default_race_time	= 5000;		// ms
+Gamify.settings.db 						= "dev";
+Gamify.settings.systoken 				= "sys540f40c9968814199ec7ca847ec45";
+Gamify.settings.race_update_interval	= 600000;	// ms (10min)
+Gamify.settings.max_min_late			= 10;		// min
+Gamify.settings.default_race_time		= 5000;		// ms
 
-Gamify.api.init(function() {
-	console.log("API mapped. Starting server...");
-	
-	// Start the server
-	http.createServer(app).listen(app.get('port'), function(){
-		console.log('API server listening on port ' + app.get('port'));
+if (options.mysql) {
+	if (options.online) {
+		console.log("Using MySQL with prod settings.");
+		var mysql = mysql.createConnection({
+			host     : 'localhost',
+			user     : 'fleetwit_beta',
+			password : '!80803666',
+			database : 'fleetwit_beta'
+		});
+	} else {
+		console.log("Using MySQL with local settings.");
+		var mysql = mysql.createConnection({
+			host     : 'localhost',
+			user     : 'root',
+			password : '',
+			database : 'fleetwit'
+		});
+	}
+	mysql.connect(function(err) {
+		console.log("MySQL: Connected.");
+		Gamify.sql = mysql;
+		Gamify.api.init(function() {
+			console.log("API mapped. Starting server...");
+			
+			// Start the server
+			http.createServer(app).listen(app.get('port'), function(){
+				console.log('API server listening on port ' + app.get('port'));
+			});
+		});
 	});
-});
+} else {
+	Gamify.api.init(function() {
+		console.log("API mapped. Starting server...");
+		
+		// Start the server
+		http.createServer(app).listen(app.get('port'), function(){
+			console.log('API server listening on port ' + app.get('port'));
+		});
+	});
+}
+
 
 var apiRoute = function(req, res) {
 	var data = {};

@@ -41,29 +41,33 @@ exports.hooks = function (Gamify) {
 				});
 			});
 			//@TODO: perfect race
-			if (response.result.total > 0) {
-				// Update the "played" achievements
-				if (response.live) {
-					Gamify.api.execute("achievement","unlock", {
-						authtoken:		Gamify.settings.systoken,
-						user:	{
-							uid:		params.__auth
-						},
-						alias:	"played_live"
-					}, function(unlocked_done) {
-						console.log("\033[35m [>played_live]:\033[37m",unlocked_done);
-					});
-				} else {
-					Gamify.api.execute("achievement","unlock", {
-						authtoken:		Gamify.settings.systoken,
-						user:	{
-							uid:		params.__auth
-						},
-						alias:	"played_arcade"
-					}, function(unlocked_done) {
-						console.log("\033[35m [>played_arcade]:\033[37m",unlocked_done);
-					});
+			if (response.result) {
+				if (response.result.total > 0) {
+					// Update the "played" achievements
+					if (response.live) {
+						Gamify.api.execute("achievement","unlock", {
+							authtoken:		Gamify.settings.systoken,
+							user:	{
+								uid:		params.__auth
+							},
+							alias:	"played_live"
+						}, function(unlocked_done) {
+							console.log("\033[35m [>played_live]:\033[37m",unlocked_done);
+						});
+					} else {
+						Gamify.api.execute("achievement","unlock", {
+							authtoken:		Gamify.settings.systoken,
+							user:	{
+								uid:		params.__auth
+							},
+							alias:	"played_arcade"
+						}, function(unlocked_done) {
+							console.log("\033[35m [>played_arcade]:\033[37m",unlocked_done);
+						});
+					}
 				}
+			} else {
+				console.log("ERROR (HOOK STATS 44)",response.result);
 			}
 			
 			// Check if we beat one of the speed achievement
