@@ -329,13 +329,14 @@ api.prototype.init = function(Gamify, callback){
 												userData.dob 	= params.olduser.sql.dob;
 											}
 											// Add the location
-											if (params.olduser.sql.city && params.olduser.sql.city != "") {
+											// Deactivated to not exhaust google's limit
+											/*if (params.olduser.sql.city && params.olduser.sql.city != "") {
 												userData.location 	= params.olduser.sql.location;
 											}
 											// ... location: Better data if available
 											if (params.olduser.publicdata && params.olduser.publicdata.location) {
 												userData.location 	= params.olduser.publicdata.location.city+", "+params.olduser.publicdata.location.state+" "+params.olduser.publicdata.location.country;
-											}
+											}*/
 											// Add the timezone
 											if (params.olduser.sql.timezone && params.olduser.sql.timezone != "") {
 												userData.timezone 	= params.olduser.sql.timezone;
