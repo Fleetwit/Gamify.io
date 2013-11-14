@@ -840,17 +840,13 @@ api.prototype.init = function(Gamify, callback){
 				
 				if (params.started) {
 					// Get the user's data:
-					scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true}}, function(user) {
+					scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{uid:true}}, function(user) {
+						console.log("\033[35m [>user]:\033[37m",user);
 						
 						scope.mongo.find({
 							collection:	"challenges",
 							query:		{
-								$or: [{
-									fbuid:		user.fbuid
-								},{
-									uid:		user.uid
-								}],
-								accepted:	true,
+								uid:		user.uid,
 								refused:	false
 							}
 						}, function(response) {
@@ -873,39 +869,28 @@ api.prototype.init = function(Gamify, callback){
 							// Process the data
 							var i;
 							var l 		= response.length;
-							var uids	= [];
+							var uids	= {};
 							for (i=0;i<l;i++) {
+								response[i].alias = response[i].race+"";
 								response[i].race = _.extend({},Gamify.data.races.getByAlias(response[i].race));
 								delete response[i].race.survey;
 								delete response[i].race.games;
-								// List the uids
-								uids.push(response[i].uid);
+								delete response[i].race.description;
+								delete response[i].race.description2;
+								delete response[i].race.survey;
+								// Index the uids
+								if (!uids[response[i].race.alias]) {
+									uids[response[i].race.alias] = 0;
+								}
+								uids[response[i].race.alias]++;
 							}
-							uids = _.uniq(uids);
+							response = Gamify.utils.indexed(response,"alias");
 							
+							for (i in response) {
+								response[i].count = uids[response[i].alias];
+							}
 							
-							// List the users
-							scope.Gamify.api.execute("user","find", {
-								query:	{
-									uid:	{
-										$in:	uids
-									}
-								}
-							}, function(users) {
-								users = Gamify.utils.indexed(users, "uid");
-								//console.log("users",users);
-								var l = response.length;
-								for (i=0;i<l;i++) {
-									if (users[response[i].uid]) {
-										response[i].user = users[response[i].uid];
-									} else {
-										response[i].user = false;
-									}
-								}
-								
-								callback(response);
-							});
-							
+							callback(response);
 							
 							
 						});
