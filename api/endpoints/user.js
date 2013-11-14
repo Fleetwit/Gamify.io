@@ -361,7 +361,8 @@ api.prototype.init = function(Gamify, callback){
 							gender:		!(!response[i].metadatas || !response[i].metadatas.gender),
 							age:		!(!response[i].metadatas || !response[i].metadatas.age),
 							location:	!(!response[i].location),
-							facebook:	!(!response[i].fbuid)
+							facebook:	!(!response[i].fbuid),
+							phone:		!(!response[i].phone)
 						};
 						if (!response[i].avatar) {
 							response[i].avatar = "images/avatar-default.png";
@@ -399,7 +400,8 @@ api.prototype.init = function(Gamify, callback){
 							gender:		!(!response[0].metadatas || !response[0].metadatas.gender),
 							age:		!(!response[0].metadatas || !response[0].metadatas.age),
 							location:	!(!response[0].location),
-							facebook:	!(!response[0].fbuid)
+							facebook:	!(!response[0].fbuid),
+							phone:		!(!response[0].phone)
 						};
 						if (!response[0].avatar) {
 							response[0].avatar = "images/avatar-default.png";
@@ -449,13 +451,15 @@ api.prototype.init = function(Gamify, callback){
 							gender:		!(!response.data[i].metadatas || !response.data[i].metadatas.gender),
 							age:		!(!response.data[i].metadatas || !response.data[i].metadatas.age),
 							location:	!(!response.data[i].location),
-							facebook:	!(!response.data[i].fbuid)
+							facebook:	!(!response.data[i].fbuid),
+							phone:		!(!response.data[i].phone)
 						};
 					}
 					
-					
-					response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
-					response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
+					if (req && req.path) {
+						response.next		= response.pagination.current >= response.pagination.pages ? false : req.path+"?"+qs.stringify(nextParam);
+						response.previous	= response.pagination.current <= 1 ? false : req.path+"?"+qs.stringify(prevParam);
+					}
 					callback(response);
 				});
 			}
@@ -981,13 +985,13 @@ api.prototype.init = function(Gamify, callback){
 				scope.Gamify.api.execute("user","get", {authtoken:params.authtoken, fields:{fbuid:true,fbfriends:true}}, function(user) {
 					
 					if (user.fbfriends) {
-						scope.Gamify.api.execute("user","paginate", {
+						scope.Gamify.api.execute("user","paginate", _.extend(params, {
 							query:		{
 								fbuid:		{
 									$in:	user.fbfriends
 								}
 							}
-						}, function(response) {
+						}), function(response) {
 							callback(response);
 							
 							// Background - unlock the achievements

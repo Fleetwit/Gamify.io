@@ -577,6 +577,43 @@ api.prototype.init = function(Gamify, callback){
 				});
 
 			}
+		},
+		
+		
+		
+		upcomingprizes: {
+			require:		[],
+			auth:			false,
+			description:	"return an array of upcoming prizes",
+			params:			{race:'Alias of the race'},
+			status:			'stable',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				// Get the next race
+				scope.Gamify.api.execute("race","upcoming", {perpage:1}, function(races) {
+					if (races && races.pagination.total > 0) {
+						var prizes = [];
+						_.each(races.data, function(race) {
+							if (race.prizes) {
+								var cp = _.extend({},race);
+								delete cp.prizes;
+								delete cp.games;
+								delete cp.description;
+								delete cp.description2;
+								delete cp.survey;
+								_.each(race.prizes, function(prize) {
+									prizes.push(_.extend({},prize, {race: cp}));
+								});
+							}
+						});
+						callback(prizes);
+						
+					} else {
+						callback([]);
+					}
+				});
+			}
 		}
 		
 	};
