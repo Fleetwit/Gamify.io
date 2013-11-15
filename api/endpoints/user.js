@@ -781,12 +781,19 @@ api.prototype.init = function(Gamify, callback){
 					collection:	"users",
 					query:		params.query,
 					limit:		1,
-					fields:		"metadatas",
+					fields:		{
+						metadatas:	true
+					},
 				}), function(response) {
+					console.log("\033[35m [>getMetas]:\033[37m",response);
 					if (response.length == 0) {
 						callback(false);
 					} else {
-						callback(response[0]);
+						if (response[0].metadatas) {
+							callback(response[0].metadatas);
+						} else {
+							callback(false);
+						}
 					}
 				});
 			}
