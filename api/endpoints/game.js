@@ -287,22 +287,14 @@ api.prototype.init = function(Gamify, callback){
 							}
 						}, function(query_output) {
 							// Let's get our position!
-							scope.mongo.count({
-								collection:		scope.collections.scores,
-								query:			{
-									race:		response[0].race,
-									live:		response[0].live,
-									"results.total":	{
-										$gt:	results.total
-									}
-								}
-							}, function(count) {
+							
+							scope.Gamify.api.execute("game","getPosition", {token: params.token}, function(position_response) {
 								// Now we process the challenges: Win or lost
 								
 								// Send the position
 								callback({
 									result:		results,
-									position:	count+1,
+									position:	position_response.position,
 									live:		response[0].live
 								});
 								
@@ -412,6 +404,7 @@ api.prototype.init = function(Gamify, callback){
 								
 								
 							});
+							
 						});
 						
 					});
