@@ -155,7 +155,6 @@ api.prototype.init = function(Gamify, callback){
 										for (j=0;j<l2;j++) {
 											try {
 												var _settings = JSON.parse(response.data[i].games[j].settings);
-												console.log("-----------------------------------------------------------------\n_settings",_settings);
 											} catch (e) {}
 											if (_settings && _settings.time) {
 												duration += _settings.time;

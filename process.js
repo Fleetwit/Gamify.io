@@ -46,7 +46,7 @@ if ('dev' == app.get('env')) {
 Gamify.settings.db 						= "dev";
 Gamify.settings.systoken 				= "sys540f40c9968814199ec7ca847ec45";
 Gamify.settings.race_update_interval	= 600000;	// ms (10min)
-Gamify.settings.max_min_late			= 10;		// min
+Gamify.settings.max_min_late			= 5;		// min
 Gamify.settings.default_race_time		= 5000;		// ms
 
 if (options.mysql) {
@@ -71,21 +71,25 @@ if (options.mysql) {
 		console.log("MySQL: Connected.");
 		Gamify.sql = mysql;
 		Gamify.api.init(function() {
-			console.log("API mapped. Starting server...");
-			
-			// Start the server
-			http.createServer(app).listen(app.get('port'), function(){
-				console.log('API server listening on port ' + app.get('port'));
+			console.log("API mapped. Starting Mailstack...");
+			Gamify.mailstack = new Gamify.Mailstack(Gamify.settings.db, Gamify, function() {
+				console.log("Mailstack started. Starting server...");
+				// Start the server
+				http.createServer(app).listen(app.get('port'), function(){
+					console.log('API server listening on port ' + app.get('port'));
+				});
 			});
 		});
 	});
 } else {
 	Gamify.api.init(function() {
-		console.log("API mapped. Starting server...");
-		
-		// Start the server
-		http.createServer(app).listen(app.get('port'), function(){
-			console.log('API server listening on port ' + app.get('port'));
+		console.log("API mapped. Starting Mailstack...");
+		Gamify.mailstack = new Gamify.Mailstack(Gamify.settings.db, Gamify, function() {
+			console.log("Mailstack started. Starting server...");
+			// Start the server
+			http.createServer(app).listen(app.get('port'), function(){
+				console.log('API server listening on port ' + app.get('port'));
+			});
 		});
 	});
 }

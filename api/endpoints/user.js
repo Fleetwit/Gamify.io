@@ -159,6 +159,12 @@ api.prototype.init = function(Gamify, callback){
 					}, function() {
 						scope.Gamify.api.execute("user","getAuthToken", {user: {uid:uid}}, function(response) {
 							callback(response);
+							
+							// Background: send an email
+							scope.Gamify.mailstack.send({
+								type:	"signup",
+								user:	userdata
+							});
 						});
 					});
 				}
@@ -836,6 +842,127 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
+		passwordreset: {
+			require:		['email'],
+			params:			{},
+			auth:			false,
+			description:	"Create a reset link for the user",
+			status:			'stable',
+			version:		1.1,
+			callback:		function(params, req, res, callback) {
+				
+				// Check if there's a user
+				scope.mongo.find({
+					collection:		"users",
+					query:			{
+						email: params.email
+					},
+					fields:		{
+						uid:		true,
+						firstname:	true,
+						lastname:	true,
+						email:		true
+					}
+				}, function(user) {
+					if (user.length > 0) {
+						user = user[0];
+						var token 	= scope.Gamify.crypto.md5(scope.Gamify.uuid.v4());
+						
+						// Insert the token
+						scope.mongo.insert({
+							collection:		"passwordreset",
+							data:			{
+								uid:	user.uid,
+								token:	token,
+								time:	new Date()
+							}
+						}, function() {});
+						
+						// Send the email
+						Gamify.mailstack.send({
+							user:	user,
+							params:	{
+								token:	token
+							},
+							type:	"passwordreset"
+						});
+						callback({sent:true});
+					} else {
+						callback(Gamify.api.errorResponse("There are no accounts registered with that email."));
+					}
+				});
+				
+				
+			}
+		},
+		
+		
+		
+		
+		passwordresetupdate: {
+			require:		['token'],
+			params:			{},
+			auth:			false,
+			description:	"Change the password and login",
+			status:			'stable',
+			version:		1.1,
+			callback:		function(params, req, res, callback) {
+				
+				
+				params	= scope.Gamify.api.fixTypes(params, {
+					password:	'md5'
+				});
+				
+				// Check if there's a user
+				scope.mongo.find({
+					collection:		"passwordreset",
+					query:			{
+						token: params.token
+					}
+				}, function(response) {
+					if (response.length > 0) {
+						var request = response[0];
+						
+						scope.Gamify.api.execute("user","getAuthToken", {
+							user:	{
+								uid:	request.uid
+							}
+						}, callback);
+						
+						// Background
+						// Update the user's password
+						scope.mongo.update({
+							collection:	"users",
+							query:		{
+								uid:	request.uid
+							},
+							data:		{
+								$set: {
+									password:	params.password
+								}
+							}
+						}, function(){});
+						
+						// Delete the token
+						scope.mongo.remove({
+							collection:	"passwordreset",
+							query:		{
+								token: params.token
+							}
+						}, function(){});
+						
+					} else {
+						callback(Gamify.api.errorResponse("The token for that request is expired or invalid."));
+					}
+				});
+				
+				
+			}
+		},
+		
+		
+		
+		
 		getChallenges: {
 			require:		[],
 			params:			{started:"Bool - return the challenges we accepted but didn't play yet."},
@@ -1085,29 +1212,34 @@ api.prototype.init = function(Gamify, callback){
 				
 				
 				
-				if (params.action == "race.register") {
+				if (params.data.action == "race.register") {
+					console.log("----------------------------------------------------------------------------\n----------------------------------------------------------------------------\n\033[35m [>params.action]:\033[37m",params.data.action);
+					
 					// Check if ther user is already registered
 					scope.Gamify.api.execute("race","is_registered", {
 						authtoken:		params.authtoken,
 						__auth:			params.__auth,
 						__authcheck:	scope.Gamify.settings.systoken,
-						race:			params.race
-					}, function(user) {
+						race:			params.data.race
+					}, function(status) {
+						console.log("----------------------------------------------------------------------------\n----------------------------------------------------------------------------\n\033[35m [>is_registered]:\033[37m",status);
 						
-						
-						scope.Gamify.api.execute("user","paginate", {
-							query:		{
-								fbuid:		{
-									$in:	user.fbfriends
+						if (!status.registered) {
+							logCreate();
+							
+							// Background: send an email
+							scope.Gamify.mailstack.send({
+								type:	"registration",
+								uid:	params.__auth,
+								params:	{
+									race: params.data.race
 								}
-							}
-						}, function(status) {
-							if (!status.registered) {
-								logCreate();
-							} else {
-								callback({logged: true});
-							}
-						});
+							});
+							
+						} else {
+							callback({logged: true});
+						}
+						
 					});
 				} else {
 					logCreate();
