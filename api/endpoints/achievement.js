@@ -68,7 +68,8 @@ api.prototype.init = function(Gamify, callback){
 				scope.Gamify.api.execute("achievement","find", {query:{alias:params.alias}, authtoken:Gamify.settings.systoken}, function(response) {
 					
 					if (response.length == 0) {
-						callback(scope.Gamify.api.errorResponse('This achievement doesn\'t exist.'));
+						callback(scope.Gamify.api.errorResponse('This achievement doesn\'t exist ('+params.alias+').'));
+						return false;
 					}
 					// Can we earn this achievement more than once?
 					var multi 	= response[0].multi;

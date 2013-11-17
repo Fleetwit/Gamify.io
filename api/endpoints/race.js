@@ -80,12 +80,16 @@ api.prototype.init = function(Gamify, callback){
 				//console.log("\n\n\n\n\n\n\n\033[32mParams1:\033[0m",params);
 				
 				params	= _.extend({
-					perpage:	5,
+					perpage:	500,
 					page:		1,
 					query:		{},
-					sort:		{},
+					sort:		{
+						start_time:	1
+					},
 					options:	{}
-				},params);
+				},params, {
+					collection:	"races",
+				});
 				
 				if (params.upcoming) {
 					params.query.start_time 	= {$gt:	new Date()};
@@ -97,14 +101,9 @@ api.prototype.init = function(Gamify, callback){
 				}
 				
 				var paginate = function() {
-					//console.log("\n\n\n\n\n\n\n\033[32mParams2:\033[0m",JSON.stringify(params,null,4));
-				
-					scope.mongo.paginate(_.extend(params.options,{
-						collection:	"races",
-						query:		_.extend({},params.query),
-						sort:		_.extend({},params.sort),
-						page:		params.page
-					}), function(response) {
+					console.log("\n\n\n\n\n\n\n\033[32mParams2:\033[0m",JSON.stringify(params,null,4));
+					
+					scope.mongo.paginate(params, function(response) {
 						var nextParam		= _.extend({},params);
 						nextParam.page 		= response.pagination.current+1;
 						var prevParam		= _.extend({},params);
@@ -281,6 +280,9 @@ api.prototype.init = function(Gamify, callback){
 						
 						
 					});
+				} else if (params.authtoken = Gamify.settings.systoken) {
+					params.query	= _.extend(params.query,{});
+					paginate();
 				} else {
 					// Only show the public races
 					params.query	= _.extend(params.query,{
