@@ -132,7 +132,7 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
-		test: {
+		importReg: {
 			require:		[],
 			auth:			false,
 			description:	"",
@@ -140,46 +140,89 @@ api.prototype.init = function(Gamify, callback){
 			status:			'dev',
 			version:		0.1,
 			callback:		function(params, req, res, callback) {
-				
-				var data = [{
-					color:	"red",
-					type:	"fruit",
-					name:	"strawberry"
-				},{
-					color:	"red",
-					type:	"veg",
-					name:	"tomatoe"
-				},{
-					color:	"red",
-					type:	"fruit",
-					name:	"Berry"
-				},{
-					color:	"yellow",
-					type:	"fruit",
-					name:	"Banana"
-				},{
-					color:	"yellow",
-					type:	"vegetable",
-					name:	"Yellow Pepper"
-				},{
-					color:	"yellow",
-					type:	"vegetable",
-					name:	"Yellow Cabbage"
-				},{
-					color:	"green",
-					type:	"fruit",
-					name:	"Green Nuts"
-				}];
-				
-				
-				callback(Gamify.utils.group(data, ["type","color"]));
+				scope.mongo_old.find({
+					collection:	'datastore',
+					query:		{
+						//uid:	9
+					}
+				}, function(oldusers) {
+					
+					console.log("oldusers imported: ",oldusers.length);
+					
+					var __stats = {};
+					
+					var importStack = new Gamify.stack();
+					_.each(oldusers, function(olduser) {
+						importStack.add(function(params, onProcessed) {
+							// Get the user's uid
+							if (params.olduser.email) {
+								scope.mongo.find({
+									collection:	"users",
+									query:	{
+										email:	params.olduser.email
+									}
+								}, function(users) {
+									
+									console.log("users found:",users.length);
+									
+									if (users.length > 0) {
+										
+										// save the new uid as "uuid"
+										params.olduser.uuid = users[0].uid;
+										
+										
+										// Add each user import op to a new layer in the stack
+									
+										
+										if (params.olduser.racedata && params.olduser.racedata.length > 0) {
+											
+											var groupedData = _.groupBy(params.olduser.racedata, function(item) {
+												return item["race"];
+											});
+											
+											
+											_.each(params.olduser.racedata, function(racereg) {
+												if (racereg.type && racereg.type == "registration") {
+													// Register for the race
+													console.log(params.olduser.email+" -> "+Gamify.data.oldraces.getByUuid(racereg.race).alias);
+													
+													scope.Gamify.api.execute("user","log", {
+														authtoken:		Gamify.settings.systoken,
+														__auth:			params.olduser.uuid,
+														__authcheck:	Gamify.settings.systoken,
+														data:			{
+															action:	"race.register",
+															race:	Gamify.data.oldraces.getByUuid(racereg.race).alias
+														}
+													}, function(response) {
+														if (!__stats[params.olduser.email]) {
+															__stats[params.olduser.email] = [];
+														}
+														__stats[params.olduser.email].push(Gamify.data.oldraces.getByUuid(racereg.race).alias);
+														onProcessed();
+													});
+												}
+												
+											});
+										}
+													
+											
+										//
+									}
+								});
+							}
+						},{olduser: olduser});
+					});
+					
+					
+					importStack.process(function() {
+						console.log("Finished.",__stats);
+						callback(__stats);
+					}, true);	// Async
+					
+				});
 			}
 		},
-		
-		
-		
-		
-		
 		
 		
 		
