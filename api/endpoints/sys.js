@@ -153,6 +153,7 @@ api.prototype.init = function(Gamify, callback){
 					
 					var importStack = new Gamify.stack();
 					_.each(oldusers, function(olduser) {
+						console.log("User:",olduser.email);
 						importStack.add(function(params, onProcessed) {
 							// Get the user's uid
 							if (params.olduser.email) {
@@ -199,17 +200,25 @@ api.prototype.init = function(Gamify, callback){
 															__stats[params.olduser.email] = [];
 														}
 														__stats[params.olduser.email].push(Gamify.data.oldraces.getByUuid(racereg.race).alias);
-														onProcessed();
+														
 													});
 												}
 												
 											});
+											
+											onProcessed();
+										} else {
+											onProcessed();
 										}
 													
 											
 										//
+									} else {
+										onProcessed();
 									}
 								});
+							} else {
+								onProcessed();
 							}
 						},{olduser: olduser});
 					});
