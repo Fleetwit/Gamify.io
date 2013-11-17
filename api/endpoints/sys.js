@@ -155,74 +155,76 @@ api.prototype.init = function(Gamify, callback){
 					_.each(oldusers, function(olduser) {
 						
 						console.log("User:",olduser);
-						
-						importStack.add(function(params, onProcessed) {
-							// Get the user's uid
-							if (params.olduser.email) {
-								scope.mongo.find({
-									collection:	"users",
-									query:	{
-										email:	params.olduser.email
-									}
-								}, function(users) {
-									
-									console.log("users found:",users.length);
-									
-									if (users.length > 0) {
+						if (olduser.privatedata) {
+							olduser.email = olduser.privatedata.email;
+							importStack.add(function(params, onProcessed) {
+								// Get the user's uid
+								if (params.olduser.email) {
+									scope.mongo.find({
+										collection:	"users",
+										query:	{
+											email:	params.olduser.email
+										}
+									}, function(users) {
 										
-										// save the new uid as "uuid"
-										params.olduser.uuid = users[0].uid;
+										console.log("users found:",users.length);
 										
-										
-										// Add each user import op to a new layer in the stack
-									
-										
-										if (params.olduser.racedata && params.olduser.racedata.length > 0) {
+										if (users.length > 0) {
 											
-											var groupedData = _.groupBy(params.olduser.racedata, function(item) {
-												return item["race"];
-											});
+											// save the new uid as "uuid"
+											params.olduser.uuid = users[0].uid;
 											
 											
-											_.each(params.olduser.racedata, function(racereg) {
-												if (racereg.type && racereg.type == "registration") {
-													// Register for the race
-													console.log(params.olduser.email+" -> "+Gamify.data.oldraces.getByUuid(racereg.race).alias);
-													
-													scope.Gamify.api.execute("user","log", {
-														authtoken:		Gamify.settings.systoken,
-														__auth:			params.olduser.uuid,
-														__authcheck:	Gamify.settings.systoken,
-														data:			{
-															action:	"race.register",
-															race:	Gamify.data.oldraces.getByUuid(racereg.race).alias
-														}
-													}, function(response) {
-														if (!__stats[params.olduser.email]) {
-															__stats[params.olduser.email] = [];
-														}
-														__stats[params.olduser.email].push(Gamify.data.oldraces.getByUuid(racereg.race).alias);
-														
-													});
-												}
+											// Add each user import op to a new layer in the stack
+										
+											
+											if (params.olduser.racedata && params.olduser.racedata.length > 0) {
 												
-											});
-											
-											onProcessed();
+												var groupedData = _.groupBy(params.olduser.racedata, function(item) {
+													return item["race"];
+												});
+												
+												
+												_.each(params.olduser.racedata, function(racereg) {
+													if (racereg.type && racereg.type == "registration") {
+														// Register for the race
+														console.log(params.olduser.email+" -> "+Gamify.data.oldraces.getByUuid(racereg.race).alias);
+														
+														scope.Gamify.api.execute("user","log", {
+															authtoken:		Gamify.settings.systoken,
+															__auth:			params.olduser.uuid,
+															__authcheck:	Gamify.settings.systoken,
+															data:			{
+																action:	"race.register",
+																race:	Gamify.data.oldraces.getByUuid(racereg.race).alias
+															}
+														}, function(response) {
+															if (!__stats[params.olduser.email]) {
+																__stats[params.olduser.email] = [];
+															}
+															__stats[params.olduser.email].push(Gamify.data.oldraces.getByUuid(racereg.race).alias);
+															
+														});
+													}
+													
+												});
+												
+												onProcessed();
+											} else {
+												onProcessed();
+											}
+														
+												
+											//
 										} else {
 											onProcessed();
 										}
-													
-											
-										//
-									} else {
-										onProcessed();
-									}
-								});
-							} else {
-								onProcessed();
-							}
-						},{olduser: olduser});
+									});
+								} else {
+									onProcessed();
+								}
+							},{olduser: olduser});
+						}
 					});
 					
 					
