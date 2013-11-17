@@ -237,7 +237,6 @@ api.prototype.init = function(Gamify, callback){
 								}
 							});
 						},{olduser: olduser});
-						}
 					});
 					
 					
