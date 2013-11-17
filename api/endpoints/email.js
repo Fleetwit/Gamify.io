@@ -82,7 +82,7 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
-				request.get('https://sendgrid.com/api/unsubscribes.add.json?api_user=fleetwit&api_key=2122ftpssh808036665&email='+escape(params.email), function (error, response, body) {
+				request.get('https://sendgrid.com/api/unsubscribes.add.json?api_user=fleetwit&api_key=2122ftpssh80803666&email='+escape(params.email), function (error, response, body) {
 					scope.mongo.insert({
 						collection:	"mailstack",
 						data:		{
