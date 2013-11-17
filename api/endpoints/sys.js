@@ -153,7 +153,9 @@ api.prototype.init = function(Gamify, callback){
 					
 					var importStack = new Gamify.stack();
 					_.each(oldusers, function(olduser) {
-						console.log("User:",olduser.email);
+						
+						console.log("User:",olduser);
+						
 						importStack.add(function(params, onProcessed) {
 							// Get the user's uid
 							if (params.olduser.email) {
