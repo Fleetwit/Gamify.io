@@ -46,7 +46,7 @@ if ('dev' == app.get('env')) {
 
 Gamify.settings.db 						= options.db;
 Gamify.settings.systoken 				= "sys540f40c9968814199ec7ca847ec45";
-Gamify.settings.race_update_interval	= 60000;	// ms (1min)
+Gamify.settings.race_update_interval	= 5000;		// ms (1min)
 Gamify.settings.max_min_late			= 5;		// min
 Gamify.settings.default_race_time		= 5000;		// ms
 
