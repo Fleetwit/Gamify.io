@@ -161,8 +161,9 @@ api.prototype.init = function(Gamify, callback){
 										}
 										
 									}
-									response.data[i].end_time	= new Date(response.data[i].start_time+duration).getTime();
-									response.data[i].ends_in	= new Date(response.data[i].start_time+duration).getTime()-new Date().getTime();
+									response.data[i].end_time	= new Date(response.data[i].start_time).getTime()+(duration*1000);
+									response.data[i].ends_in	= new Date(response.data[i].start_time+duration).getTime()+(duration*1000)-new Date().getTime();
+									
 								}
 								onProcessed();
 								//callback(response);
@@ -441,6 +442,25 @@ api.prototype.init = function(Gamify, callback){
 							return a.o-b.o;
 						});
 						
+						// Check the end time and duration
+						var duration = 0;
+						if (race.games && race.games.length > 0) {
+							var j 	= 0;
+							var l2 	= race.games.length;
+							for (j=0;j<l2;j++) {
+								try {
+									var _settings = JSON.parse(race.games[j].settings);
+								} catch (e) {}
+								if (_settings && _settings.time) {
+									duration += _settings.time;
+								}
+							}
+							
+						}
+						race.duration	= duration;
+						race.end_time	= new Date(race.start_time).getTime()+(duration*1000);
+						race.ends_in	= new Date(race.start_time).getTime()+(duration*1000)-new Date().getTime();
+						
 						// Get the client
 						scope.Gamify.api.execute("client","find",{
 							uuid:	race.client,
@@ -448,6 +468,7 @@ api.prototype.init = function(Gamify, callback){
 							if (data && data.length > 0) {
 								race.client = data[0];
 							}
+							
 							callback(race);
 							
 						});

@@ -90,7 +90,7 @@ api.prototype.init = function(Gamify, callback){
 						var splitted = user.email.split("@");
 						if (splitted.length == 2) {
 							var email_domain = splitted[1];
-							if (email_domain == "fleetwit.com") {
+							if (email_domain == "fleetwit.com" && params.live == false) {
 								var starts_in	= Gamify.settings.default_race_time;		// Default timer
 								var can_play	= true;
 							}
