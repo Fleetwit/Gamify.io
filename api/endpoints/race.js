@@ -565,7 +565,14 @@ api.prototype.init = function(Gamify, callback){
 							uids.push(registrations[i].uid);
 						}
 						// Paginate the users
-						scope.Gamify.api.execute("user","paginate", {query: {uid: {$in: uids}}, authtoken: Gamify.settings.systoken}, function(response) {
+						scope.Gamify.api.execute("user","paginate", _.extend(params, {
+							query: {
+								uid: {
+									$in: uids
+								}
+							},
+							authtoken: Gamify.settings.systoken
+						}), function(response) {
 							callback({
 								data:		response.data,
 								pagination:	{
