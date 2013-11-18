@@ -14,7 +14,8 @@ var options = _.extend({
 	env:		"dev",
 	debug_mode:	false,
 	port:		8080,
-	mysql:		false
+	mysql:		false,
+	db:			"prod"
 },processArgs());
 
 var app = express();
@@ -43,7 +44,7 @@ if ('dev' == app.get('env')) {
 }
 
 
-Gamify.settings.db 						= "prod";
+Gamify.settings.db 						= options.db;
 Gamify.settings.systoken 				= "sys540f40c9968814199ec7ca847ec45";
 Gamify.settings.race_update_interval	= 60000;	// ms (1min)
 Gamify.settings.max_min_late			= 5;		// min

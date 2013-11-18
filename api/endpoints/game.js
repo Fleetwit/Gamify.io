@@ -85,6 +85,18 @@ api.prototype.init = function(Gamify, callback){
 						}
 					}
 					
+					// Check the domain for the user's email
+					if (user.email) {
+						var splitted = user.email.split("@");
+						if (splitted.length == 2) {
+							var email_domain = splitted[1];
+							if (email_domain == "fleetwit.com") {
+								var starts_in	= Gamify.settings.default_race_time;		// Default timer
+								var can_play	= true;
+							}
+						}
+					}
+					
 					scope.mongo.insert({
 						collection:	scope.collections.scores,
 						data:		{
