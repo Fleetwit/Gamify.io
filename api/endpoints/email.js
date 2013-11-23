@@ -2,6 +2,7 @@ var _ 					= require('underscore');
 var qs 					= require("querystring");
 var moment				= require('moment');
 var request 			= require('request');
+var Twig				= require("twig").twig;
 
 // Users
 function api() {
@@ -16,12 +17,51 @@ api.prototype.init = function(Gamify, callback){
 	var methods = {
 		
 		
+		// Turn off the email processing
+		turnoff: {
+			require:		[],
+			params:			{},
+			auth:			'sys',
+			description:	"Turn off the emails",
+			status:			'prod',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				if (Gamify.settings.process_emails) {
+					Gamify.settings.process_emails = false;
+					Gamify.Arbiter.inform("mailstack_status", false);
+				}
+				
+				callback({status:"off"});
+				
+			}
+		},
+		
+		// Turn on the email processing
+		turnon: {
+			require:		[],
+			params:			{},
+			auth:			'sys',
+			description:	"Turn off the emails",
+			status:			'prod',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				if (!Gamify.settings.process_emails) {
+					Gamify.settings.process_emails = true;
+					Gamify.Arbiter.inform("mailstack_status", true);
+				}
+				
+				callback({status:"on"});
+				
+			}
+		},
 		
 		
 		
 		send: {
-			require:		['tpl','params'],
-			params:			{tpl:"Template UUID", params:"Mailstack parameters",test:"Bool"},
+			require:		['type','params','target'],
+			params:			{type:"Template type (alias)", params:"Mailstack parameters",target:"target: <code>all</code>, <code>registered</code>, <code>unregistered</code>",race:"targeting: race option",test:"Bool"},
 			auth:			"sys",
 			description:	"Send an email ",
 			status:			'dev',
@@ -29,48 +69,141 @@ api.prototype.init = function(Gamify, callback){
 			callback:		function(params, req, res, callback) {
 				
 				params	= scope.Gamify.api.fixTypes(params, {
-					params:		'array',
+					params:		'object',
 					test:		'bool'
 				});
 				
-				scope.mongo.find({
-					collection: "users",
-					fields:		{
-						firstname:	true,
-						lastname:	true,
-						email:		true
-					}
-				}, function(users) {
+				
+				var Process = function(users) {
 					var insert = [];
 					_.each(users, function(user) {
 						var data = {
 							user:		user,
-							tpl:		params.tpl,
-							type:		"fromtemplate",
+							type:		params.type,
 							time:		new Date().getTime(),
 							uuid:		Gamify.uuid.v4(),
 							priority:	5,
 							params:		params.params
 						};
-						if (params.test) {
-							if (user.email == "julien@fleetwit.com" || user.email == "david@fleetwit.com") {
-								insert.push(data);
-							}
-						} else {
-							insert.push(data);
+						insert.push(data);
+					});
+					// if it's a test, limit to 5 emails
+					if (params.test) {
+						insert = insert.splice(0,5);
+						// Send all of them to me
+						var i;
+						var l = insert.length;
+						for (i=0;i<l;i++) {
+							insert[i].user.email = "julien@fleetwit.com";
 						}
-						
-					})
+					}
 					scope.mongo.insert({
 						collection:	"mailstack",
 						data:		insert
 					}, function(){});
 					
-					callback(insert);
-				});
+					if (insert.length > 0) {
+						callback({
+							sent:	insert.length,
+							params:	params,
+							sample:	insert[0]
+						});
+					} else {
+						callback({
+							sent:	0,
+							params:	params
+						});
+					}
+				}
+				
+				
+				switch (params.target) {
+					case "all":
+						scope.mongo.find({
+							collection: "users",
+							fields:		{
+								firstname:	true,
+								lastname:	true,
+								email:		true,
+								metadatas:	true
+							}
+						}, function(users) {
+							Process(users);
+						});
+					break;
+					
+					
+					case "registered":
+						
+						// Find the list of users who are registered to the race
+						scope.mongo.distinct({
+							collection:	"userlogs",
+							query:		{
+								action:	"race.register",
+								race:	params.race
+							},
+							key:		"uid"
+						}, function(uids) {
+							
+							scope.mongo.find({
+								collection: "users",
+								fields:		{
+									firstname:	true,
+									lastname:	true,
+									email:		true,
+									metadatas:	true
+								},
+								query:	{
+									uid: {
+										$in: uids
+									}
+								}
+							}, function(users) {
+								Process(users);
+							});
+						});
+						
+					break;
+					
+					
+					case "unregistered":
+						// Find the list of users who are registered to the race
+						scope.mongo.distinct({
+							collection:	"userlogs",
+							query:		{
+								action:	"race.register",
+								race:	params.race
+							},
+							key:		"uid"
+						}, function(uids) {
+							
+							scope.mongo.find({
+								collection: "users",
+								fields:		{
+									firstname:	true,
+									lastname:	true,
+									email:		true,
+									metadatas:	true
+								},
+								query:	{
+									uid: {
+										$nin: uids
+									}
+								}
+							}, function(users) {
+								Process(users);
+							});
+						});
+						
+					break;
+				}
+				
+				
 				
 			}
 		},
+		
+		
 		
 		
 		unsubscribe: {

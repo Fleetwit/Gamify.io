@@ -1213,7 +1213,7 @@ api.prototype.init = function(Gamify, callback){
 				
 				
 				if (params.data.action == "race.register") {
-					console.log("\n\033[35m [>params.action]:\033[37m",params.data.action);
+					//console.log("\n\033[35m [>params.action]:\033[37m",params.data.action);
 					
 					// Check if ther user is already registered
 					scope.Gamify.api.execute("race","is_registered", {
@@ -1222,14 +1222,14 @@ api.prototype.init = function(Gamify, callback){
 						__authcheck:	scope.Gamify.settings.systoken,
 						race:			params.data.race
 					}, function(status) {
-						console.log("\n\033[35m [>is_registered]:\033[37m",status);
+						//console.log("\n\033[35m [>is_registered]:\033[37m",status);
 						
 						if (!status.registered) {
 							logCreate();
 							
 							// Background: send an email
 							scope.Gamify.mailstack.send({
-								type:	"registration",
+								type:	"race_register",
 								uid:	params.__auth,
 								params:	{
 									race: params.data.race

@@ -10,12 +10,15 @@ var path 		= require('path');
 var Gamify 		= require("Gamify.io");
 
 var options = _.extend({
-	online:		true,
-	env:		"dev",
-	debug_mode:	false,
-	port:		8080,
-	mysql:		false,
-	db:			"prod"
+	online:			true,
+	env:			"dev",
+	debug_mode:		false,
+	port:			8080,
+	mysql:			false,
+	db:				"prod",
+	batchsize:		50,
+	mailmethod:		"smtp",
+	process_emails:	false
 },processArgs());
 
 var app = express();
@@ -45,10 +48,15 @@ if ('dev' == app.get('env')) {
 
 
 Gamify.settings.db 						= options.db;
+Gamify.settings.mailmethod 				= options.mailmethod;
 Gamify.settings.systoken 				= "sys540f40c9968814199ec7ca847ec45";
-Gamify.settings.race_update_interval	= 5000;		// ms (1min)
-Gamify.settings.max_min_late			= 5;		// min
-Gamify.settings.default_race_time		= 5000;		// ms
+Gamify.settings.race_update_interval	= 500000;		// ms - refresh rate for the races
+Gamify.settings.mail_update_interval	= 5000;		// ms - refresh rate for the mail templates
+Gamify.settings.default_race_time		= 5000;		// ms - countdown for the arcade races
+Gamify.settings.max_min_late			= 5;		// min - How much  you can be late without being kicked out
+Gamify.settings.mailstack_batchsize 	= options.batchsize;	// Mails to process per batch
+Gamify.settings.mailstack_delay 		= 1000;	// Delay between mailstack batches
+Gamify.settings.process_emails 			= options.process_emails;
 
 if (options.mysql) {
 	if (options.online) {

@@ -10,7 +10,8 @@
 		"facebook-api":	"latest",
 		"twig": 		"*",
 		"moment":		"latest",
-		"mysql":		"latest"
+		"mysql":		"latest",
+		"bbcode":		"latest"
 	}
 }
 
