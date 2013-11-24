@@ -460,6 +460,7 @@ api.prototype.init = function(Gamify, callback){
 						race.duration	= duration;
 						race.end_time	= new Date(race.start_time).getTime()+(duration*1000);
 						race.ends_in	= new Date(race.start_time).getTime()+(duration*1000)-new Date().getTime();
+						race.starts_in	= new Date(race.start_time).getTime()-new Date().getTime();
 						
 						// Get the client
 						scope.Gamify.api.execute("client","find",{
@@ -554,7 +555,7 @@ api.prototype.init = function(Gamify, callback){
 		get_registered: {
 			require:		['race'],
 			auth:			false,
-			description:	"Check if the user is registered to the race.",
+			description:	"Get the list of registered users for a race",
 			params:			{race:'Alias of the race'},
 			status:			'stable',
 			version:		1,

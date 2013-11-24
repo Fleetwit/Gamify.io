@@ -601,7 +601,7 @@ api.prototype.init = function(Gamify, callback){
 				
 				//console.log("\033[35m BEFORE:\033[37m",params);
 				
-				params = Gamify.api.filter(params, ['authtoken','__auth','gender','email','dob','location','phone','reminder_text','reminder_email','avatar']);
+				params = Gamify.api.filter(params, ['authtoken','__auth','gender','email','dob','location','phone','reminder_text','reminder_email','avatar','firstname','lastname']);
 				
 				var stack 			= new Gamify.stack();
 				var updateQuery 	= {};
@@ -656,6 +656,8 @@ api.prototype.init = function(Gamify, callback){
 						case "reminder_text":
 						case "reminder_email":
 						case "avatar":
+						case "firstname":
+						case "lastname":
 							updateQuery[label] 	= params[label];
 						break;
 						case "gender":
@@ -1247,6 +1249,39 @@ api.prototype.init = function(Gamify, callback){
 				
 			}
 		},
+		
+		
+		get_registered: {
+			require:		[],
+			auth:			"authtoken",
+			description:	"Get the list of registered races",
+			params:			{query:"MongoDB Query",sort:"Sort options",options:"Pagination options"},
+			status:			'stable',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				// Get the count
+				scope.mongo.distinct({
+					collection:	'userlogs',
+					query:		{
+						uid:		params.__auth,
+						action:		"race.register"
+					},
+					key:		"race"
+				}, function(races) {
+					
+					scope.Gamify.api.execute("race","paginate", _.extend(params, {
+						query: {
+							alias: {
+								$in: races
+							}
+						}
+					}), callback);
+					
+				});
+
+			}
+		}
 	};
 	
 	// Init a connection
