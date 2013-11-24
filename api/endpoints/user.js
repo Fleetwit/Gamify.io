@@ -1255,9 +1255,9 @@ api.prototype.init = function(Gamify, callback){
 			require:		[],
 			auth:			"authtoken",
 			description:	"Get the list of registered races",
-			params:			{query:"MongoDB Query",sort:"Sort options",options:"Pagination options"},
-			status:			'stable',
-			version:		1,
+			params:			{upcoming:"Bool"},
+			status:			'dev',
+			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
 				// Get the count
@@ -1270,13 +1270,23 @@ api.prototype.init = function(Gamify, callback){
 					key:		"race"
 				}, function(races) {
 					
-					scope.Gamify.api.execute("race","paginate", _.extend(params, {
-						query: {
+					var query = {};
+					
+					if (params.upcoming) {
+						query = {
+							start_time: {
+								$gt:	new Date(new Date().getTime()-(5*60*1000))	// Up to 5min ago
+							}
+						};
+					}
+					
+					scope.Gamify.api.execute("race","paginate", {
+						query: _.extend({
 							alias: {
 								$in: races
 							}
-						}
-					}), callback);
+						},query)
+					}, callback);
 					
 				});
 
