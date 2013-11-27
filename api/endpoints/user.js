@@ -1268,7 +1268,9 @@ api.prototype.init = function(Gamify, callback){
 						uid:	params.__auth,
 						race:	params.race
 					}
-				})
+				}, function() {
+					callback({unregistered:true,race:params.race});
+				});
 				
 			}
 		},
