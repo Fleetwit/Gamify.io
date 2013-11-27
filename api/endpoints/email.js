@@ -205,6 +205,116 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		
+		sendranking: {
+			require:		['race'],
+			params:			{race:"alias",test:"Bool"},
+			auth:			"sys",
+			description:	"Send a ranking email",
+			status:			'dev',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				params	= scope.Gamify.api.fixTypes(params, {
+					test:		'bool'
+				});
+				
+				
+				scope.mongo.find({
+					collection:	"scores",
+					query:		{
+						race:	params.race,
+						live:	true,
+						'result.total': {
+							$gt: 0
+						}
+					},
+					fields:		{
+						result:	true,
+						uid:	true
+					},
+					sort:	{
+						'result.total': -1
+					}
+				}, function(userlist) {
+					
+					// Get the list of users
+					var i;
+					var l = userlist.length;
+					var uids = [];
+					for (i=0;i<l;i++) {
+						uids.push(userlist[i].uid);
+					}
+					
+					// Get the user data
+					scope.mongo.find({
+						collection: "users",
+						fields:		{
+							firstname:	true,
+							lastname:	true,
+							email:		true,
+							uid:		true
+						},
+						query:	{
+							uid: {
+								$in: uids
+							}
+						}
+					}, function(users) {
+						// Index the users
+						users = Gamify.utils.indexed(users, 'uid');
+						
+						var insert = [];
+						
+						// Loop on the users
+						var position = 0;
+						for (i=0;i<l;i++) {
+							position++;
+							insert.push({
+								user:		users[userlist[i].uid],
+								type:		'ranking',
+								time:		new Date().getTime(),
+								uuid:		Gamify.uuid.v4(),
+								priority:	5,
+								params:		{
+									position:	position,
+									result:		userlist[i].result
+								}
+							});
+						}
+						
+						if (params.test) {
+							insert = insert.slice(0,2);
+							for (i=0;i<insert.length;i++) {
+								insert[i].user.email = "julien@fleetwit.com";
+							}
+						}
+						
+						scope.mongo.insert({
+							collection:	"mailstack",
+							data:		insert
+						}, function(){});
+						
+						if (insert.length > 0) {
+							callback({
+								sent:	insert.length,
+								params:	params,
+								sample:	insert[0]
+							});
+						} else {
+							callback({
+								sent:	0,
+								params:	params
+							});
+						}
+					});
+				});
+				
+				
+			}
+		},
+		
+		
+		
 		
 		unsubscribe: {
 			require:		['email'],

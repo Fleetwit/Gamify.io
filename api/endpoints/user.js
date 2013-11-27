@@ -1251,6 +1251,29 @@ api.prototype.init = function(Gamify, callback){
 		},
 		
 		
+		
+		
+		unregister: {
+			require:		['race'],
+			params:			{},
+			auth:			'authtoken',
+			description:	"Unregister for a race",
+			status:			'dev',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				scope.mongo.remove({
+					collection:	"userlogs",
+					query:		{
+						uid:	params.__auth,
+						race:	params.race
+					}
+				})
+				
+			}
+		},
+		
+		
 		get_registered: {
 			require:		[],
 			auth:			"authtoken",

@@ -11,7 +11,8 @@
 		"twig": 		"*",
 		"moment":		"latest",
 		"mysql":		"latest",
-		"bbcode":		"latest"
+		"bbcode":		"latest",
+		"twilio":		"latest"
 	}
 }
 
