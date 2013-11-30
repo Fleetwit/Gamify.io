@@ -277,7 +277,8 @@ api.prototype.init = function(Gamify, callback){
 								priority:	5,
 								params:		{
 									position:	position,
-									result:		userlist[i].result
+									result:		userlist[i].result,
+									race:		Gamify.data.races.getByAlias("params.race")
 								}
 							});
 						}
