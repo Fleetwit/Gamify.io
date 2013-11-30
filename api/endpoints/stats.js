@@ -256,6 +256,8 @@ api.prototype.init = function(Gamify, callback){
 			version:		1,
 			callback:		function(params, req, res, callback) {
 				
+				var i;
+				
 				params	= scope.Gamify.api.fixTypes(params, {
 					query:		'object'
 				});
@@ -264,7 +266,15 @@ api.prototype.init = function(Gamify, callback){
 					params.query = {}; 
 				}
 				
-				Gamify.log("params", params);
+				// Convert query parameters (auto-convert values to ints when possible)
+				params.query	= scope.Gamify.api.fixTypes(params.query, {});
+				
+				// remove empty query parameters
+				for (i in params.query) {
+					if (params.query[i] == '' && params.query[i] !== 0) {
+						delete params.query[i];
+					}
+				}
 				
 				
 				var stack = new Gamify.stack();
@@ -276,10 +286,10 @@ api.prototype.init = function(Gamify, callback){
 				// Get the survey
 				var survey = race.survey;
 				
-				var stats 	= {};
+				var stats 	= [];
 				
 				_.each(survey, function(question) {
-					var i;
+					
 					for (i in question) {
 						
 						switch (question[i].type) {
@@ -291,44 +301,66 @@ api.prototype.init = function(Gamify, callback){
 										query:		_.extend({},params.query,{
 											race:	params.race
 										}),
-										key:		"data."+i
+										key:		"data."+p.i
 									}, function(responses) {
-										stats[p.i] = {
+										stats.push({
+											id:			p.i,
 											type:		"list",
+											islist:		true,
 											label:		question[p.i].label,
 											data:		responses
-										}
+										});
 										onProcessed();
 									});
 								}, {i:i});
 							break;
 							case "radio":
 								var j;
-								stats[i] = {
-									type:		"list",
-									label:		question[i].label,
-									data:		{}
-								}
-								_.each(question[i].list, function(list_item) {
-									stack.add(function(p, onProcessed) {
+								
+								
+								stack.add(function(p, onProcessed) {
+									
+									var buffer = {
+										id:			p.i,
+										type:		"radio",
+										isradio:	true,
+										label:		question[p.i].label,
+										data:		{},
+										count:		0
+									};
+									
+									var substack = new Gamify.stack();
+									
+									_.each(question[p.i].list, function(list_item) {
 										var query = {
 											race:	params.race
 										};
-										query["data."+i] = list_item.value;
+										query["data."+p.i] = list_item.value;
 										
 										query = _.extend({},params.query,query);
 										
-										scope.mongo.count({
-											collection:	'surveys',
-											query:		query
-										}, function(count) {
-											
-											stats[p.i].data[list_item.value] = count;
-											
-											onProcessed();
-										});
-									}, {i:i});
-								});
+										substack.add(function(subp, onSubProcessed) {
+											scope.mongo.count({
+												collection:	'surveys',
+												query:		subp.query
+											}, function(count) {
+												
+												subp.buffer.data[list_item.value] = count;
+												subp.buffer.count += count;
+												
+												onSubProcessed();
+											});
+										},{query:query,buffer:buffer});
+										
+										
+									});
+									
+									substack.process(function() {
+										stats.push(buffer);
+										onProcessed();
+									}, true);	// async
+																		
+								}, {i:i});
 							break;
 						}
 					}
@@ -388,95 +420,7 @@ api.prototype.init = function(Gamify, callback){
 						stats:		stats,
 						filters:	filters
 					});
-				}, true);	// async
-				
-			}
-		},
-		
-		survey_explore: {
-			require:		['race'],
-			auth:			"sys",
-			description:	"Get survey stats for a race",
-			params:			{},
-			status:			'dev',
-			version:		1,
-			callback:		function(params, req, res, callback) {
-				
-				var stack = new Gamify.stack();
-				
-				
-				// Get the race data
-				var race = Gamify.data.races.getByAlias(params.race);
-				
-				// Get the survey
-				var survey = race.survey;
-				
-				var stats = {};
-				
-				_.each(survey, function(question) {
-					var i;
-					for (i in question) {
-						
-						switch (question[i].type) {
-							default:
-							case "varchar":
-								stack.add(function(p, onProcessed) {
-									scope.mongo.distinct({
-										collection:	'surveys',
-										query:		{
-											race:	params.race
-										},
-										key:		"data."+i
-									}, function(responses) {
-										stats[i] = responses;
-										onProcessed();
-									});
-								}, {});
-							break;
-							case "radio":
-								var j;
-								stats[i] = {};
-								_.each(question[i].list, function(list_item) {
-									stack.add(function(p, onProcessed) {
-										var query = {
-											race:	params.race
-										};
-										query["data."+i] = list_item.value;
-										
-										scope.mongo.count({
-											collection:	'surveys',
-											query:		query
-										}, function(count) {
-											stats[i][list_item.value] = count;
-											onProcessed();
-										});
-									}, {});
-								});
-							break;
-						}
-					}
-				});
-				
-				stack.process(function() {
-					callback(stats);
-				}, true);	// async
-				
-				/*
-				stack.add(function(p, onProcessed) {
-					scope.mongo.count({
-						collection:	'users',
-						query:		{
-							uid: {
-								$in:	uids
-							}
-						}
-					}, function(count) {
-						stats.users = count;
-						onProcessed();
-					});
-				}, {});
-				*/
-				
+				}, false);	// sync
 				
 			}
 		}

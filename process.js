@@ -50,7 +50,7 @@ if ('dev' == app.get('env')) {
 Gamify.settings.db 						= options.db;
 Gamify.settings.mailmethod 				= options.mailmethod;
 Gamify.settings.systoken 				= "sys540f40c9968814199ec7ca847ec45";
-Gamify.settings.race_update_interval	= 5000;		// ms - refresh rate for the races
+Gamify.settings.race_update_interval	= 50000;		// ms - refresh rate for the races
 Gamify.settings.mail_update_interval	= 5000;		// ms - refresh rate for the mail templates
 Gamify.settings.default_race_time		= 5000;		// ms - countdown for the arcade races
 Gamify.settings.max_min_late			= 5;		// min - How much  you can be late without being kicked out
