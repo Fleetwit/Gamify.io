@@ -84,7 +84,7 @@ api.prototype.init = function(Gamify, callback){
 					page:		1,
 					query:		{},
 					sort:		{
-						start_time:	1
+						start_time:	-1
 					},
 					options:	{}
 				},params, {

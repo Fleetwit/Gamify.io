@@ -15,7 +15,7 @@ api.prototype.init = function(Gamify, callback){
 		
 		
 		post: {
-			require:		['data'],
+			require:		['data','alias'],
 			params:			{data:'surveydata',alias:'Alias of the survey'},
 			auth:			'authtoken',
 			description:	"Save the survey data",
@@ -46,6 +46,7 @@ api.prototype.init = function(Gamify, callback){
 									date:			new Date(),
 									uid:			params.__auth,
 									metas:			metas,
+									race:			params.alias,
 									data:			params.data
 								}
 							}, function() {
