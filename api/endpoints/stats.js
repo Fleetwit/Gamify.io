@@ -423,6 +423,96 @@ api.prototype.init = function(Gamify, callback){
 				}, false);	// sync
 				
 			}
+		},
+		
+		demography: {
+			require:		['collection'],
+			auth:			"sys",
+			description:	"Get demography stats for a race",
+			params:			{collection:"Mongo Collection", query:"Filter"},
+			status:			'dev',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				var i;
+				
+				params	= scope.Gamify.api.fixTypes(params, {
+					query:		'object'
+				});
+				
+				if (!params.query) {
+					params.query = {};
+				}
+				
+				// Convert query parameters (auto-convert values to ints when possible)
+				params.query	= scope.Gamify.api.fixTypes(params.query, {});
+				
+				// remove empty query parameters
+				for (i in params.query) {
+					if (params.query[i] == '' && params.query[i] !== 0) {
+						delete params.query[i];
+					}
+				}
+				
+				
+				var stack = new Gamify.stack();
+				
+				
+				// Process the filters
+				var filters = {
+					age:			[],
+					agerange:		[],
+					city:			[],
+					country:		[],
+					gender:			[],
+					state:			[],
+					timezone:		[],
+					played_arcade:	[],
+					played_live:	[]
+				};
+				
+				var stats = {};
+				for (filter in filters) {
+					stack.add(function(p, onProcessed) {
+						
+						// db.surveys.aggregate({$match: {race: "launchrace"}}, {$project: {text: "$metas.agerange"}}, {$group: {_id: '$text', "total": {$sum: 1}}})
+						scope.mongo.aggregate({
+							collection:	params.collection,
+							rules:		[{
+								$match: params.query,
+							}, {
+								$project: {
+									text: 	"$metas."+p.filter
+								}
+							}, {
+								$group: {
+									_id: 	'$text',
+									total: 	{
+										$sum: 1
+									}
+								}
+							}]
+						}, function(output) {
+							Gamify.log("output", output);
+							if (output && output.length > 0) {
+								stats[p.filter] = {};
+								_.each(output, function(line) {
+									stats[p.filter][line['_id']] = line.total;
+								});
+							}
+							
+							onProcessed();
+						});
+					}, {filter:filter});
+				}
+				
+				stack.process(function() {
+					callback({
+						stats:		stats
+					});
+				}, false);	// sync
+				
+			}
 		}
 		
 	};
