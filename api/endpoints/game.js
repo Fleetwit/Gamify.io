@@ -40,94 +40,130 @@ api.prototype.init = function(Gamify, callback){
 					return false;
 				}
 				
-				//console.log("race",JSON.stringify(race,null,4));
 				
-				// Calculate the duration
-				var i;
-				var l = race.games.length;
-				var duration = 0;
-				for (i=0;i<l;i++) {
-					var settings 	= JSON.parse(race.games[i].settings);
-					var _duration	= settings.time;
-					if (!_duration) {
-						_duration = 180;
-					}
-					duration += _duration;
-				}
-				
-				// Get the user data first
-				scope.Gamify.api.execute("user","find", {query:{uid: params.__auth}}, function(user_response) {
-					
-					var user = user_response[0];
-					
-					var starts_in	= Gamify.settings.default_race_time;		// Default timer
-					var can_play	= true;
-					
-					// Check if the race is live
-					var race = Gamify.data.races.getByAlias(params.alias);
-					//console.log(">>>>>>>>>>>",JSON.stringify(race, null, 4));
-					// Does the race exists?
-					if (race) {
-						var race_starts_in	= new Date(race.start_time).getTime()-new Date().getTime();
-						// live race? Make sure you are not too late
-						if (params.live == true) {
-							// If you're too late, you can't play!
-							if (race_starts_in < (Gamify.settings.max_min_late*60*1000)*-1 && !params.force_entry) {	// param "force_entry" allows to play an expired live race.
-								can_play = false;
-							}
-							starts_in 			= race_starts_in;
-						} else {
-							// Not a live race. Make sure the user is not trying to play a future race tho.
-							if (race_starts_in > 0) {
-								// Race is in the future!
-								can_play = false;
-							}
+				var startGame = function() {
+					// Calculate the duration
+					var i;
+					var l = race.games.length;
+					var duration = 0;
+					for (i=0;i<l;i++) {
+						var settings 	= JSON.parse(race.games[i].settings);
+						var _duration	= settings.time;
+						if (!_duration) {
+							_duration = 180;
 						}
+						duration += _duration;
 					}
 					
-					// Check the domain for the user's email
-					if (user.email) {
-						var splitted = user.email.split("@");
-						if (splitted.length == 2) {
-							var email_domain = splitted[1];
-							if (email_domain == "fleetwit.com" && params.live == false) {
-								var starts_in	= Gamify.settings.default_race_time;		// Default timer
-								var can_play	= true;
+					// Get the user data first
+					scope.Gamify.api.execute("user","find", {query:{uid: params.__auth}}, function(user_response) {
+						
+						var user = user_response[0];
+						
+						var starts_in	= Gamify.settings.default_race_time;		// Default timer
+						var can_play	= true;
+						
+						// Check if the race is live
+						var race = Gamify.data.races.getByAlias(params.alias);
+						//console.log(">>>>>>>>>>>",JSON.stringify(race, null, 4));
+						// Does the race exists?
+						if (race) {
+							var race_starts_in	= new Date(race.start_time).getTime()-new Date().getTime();
+							// live race? Make sure you are not too late
+							if (params.live == true) {
+								// If you're too late, you can't play!
+								if (race_starts_in < (Gamify.settings.max_min_late*60*1000)*-1 && !params.force_entry) {	// param "force_entry" allows to play an expired live race.
+									can_play = false;
+								}
+								starts_in 			= race_starts_in;
+							} else {
+								// Not a live race. Make sure the user is not trying to play a future race tho.
+								if (race_starts_in > 0) {
+									// Race is in the future!
+									can_play = false;
+								}
 							}
 						}
-					}
-					
-					scope.mongo.insert({
-						collection:	scope.collections.scores,
-						data:		{
-							uid:		params.__auth,
-							race:		params.alias,
-							live:		params.live,
-							maxtime:	duration*1000,
-							registered:	new Date(),
-							late:		starts_in<0,
-							snapshot:	starts_in,
-							started:	false,
-							ended:		false,
-							token:		can_play?token:false,		// Game token, used to submit scores
-							scores:		[],
-							imported:	params.imported?true:false,
-							result:	{
-								score:		0,
-								time:		0,
-								multiplier:	0,
-								total:		0
-							},
-							metas:		_.extend({},user.metas)
+						
+						// Check the domain for the user's email
+						if (user.email) {
+							var splitted = user.email.split("@");
+							if (splitted.length == 2) {
+								var email_domain = splitted[1];
+								if (email_domain == "fleetwit.com" && params.live == false) {
+									var starts_in	= Gamify.settings.default_race_time;		// Default timer
+									var can_play	= true;
+								}
+							}
 						}
-					}, function(response) {
-						callback({
-							token:		can_play?token:false,	// No token if you can't play!
-							timer:		starts_in,
-							can_play:	can_play
+						
+						scope.mongo.insert({
+							collection:	scope.collections.scores,
+							data:		{
+								uid:		params.__auth,
+								race:		params.alias,
+								live:		params.live,
+								maxtime:	duration*1000,
+								registered:	new Date(),
+								late:		starts_in<0,
+								snapshot:	starts_in,
+								started:	false,
+								ended:		false,
+								token:		can_play?token:false,		// Game token, used to submit scores
+								scores:		[],
+								imported:	params.imported?true:false,
+								result:	{
+									score:		0,
+									time:		0,
+									multiplier:	0,
+									total:		0
+								},
+								metas:		_.extend({},user.metas)
+							}
+						}, function(response) {
+							callback({
+								token:		can_play?token:false,	// No token if you can't play!
+								timer:		starts_in,
+								can_play:	can_play
+							});
 						});
 					});
-				});
+				};
+				
+				if (params.live) {
+					// Check if we already played, if it's live
+					scope.mongo.count({
+						collection:	"scores",
+						query:	{
+							race: 	params.alias,
+							uid:	params.__auth,
+							live:	true,
+							"result.total":	{
+								$gt: 0
+							}
+						}
+					},function(count) {
+						if (count > 0) {
+							callback({
+								token:		false,	// No token if you can't play!
+								timer:		0,
+								can_play:	false,
+								reason:		"You already played the live race."
+							});
+						} else {
+							startGame();
+						}
+					});
+				} else {
+					startGame();
+				}
+				
+				
+				
+				
+				//console.log("race",JSON.stringify(race,null,4));
+				
+				
 			}
 		},
 		

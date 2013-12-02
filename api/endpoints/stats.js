@@ -429,10 +429,126 @@ api.prototype.init = function(Gamify, callback){
 			require:		['collection'],
 			auth:			"sys",
 			description:	"Get demography stats for a race",
-			params:			{collection:"Mongo Collection", query:"Filter"},
+			params:			{collection:"Mongo Collection", query:"Filter", key: "Meta key", filters:"Array"},
 			status:			'dev',
 			version:		1,
 			callback:		function(params, req, res, callback) {
+				
+				Gamify.log("params (1)",params);
+				
+				var i;
+				
+				params	= scope.Gamify.api.fixTypes(params, {
+					query:		'object'
+				});
+				
+				if (!params.query) {
+					params.query = {};
+				}
+				
+				if (!params.key) {
+					params.key = "metas";
+				}
+				if (!params.filters) {
+					params.filters = ["age","agerange","city","country","gender","state","timezone","played_arcade","played_live"];
+				}
+				
+				params.group = {
+					played_arcade:	[
+						0,
+						[1,5],
+						[6,10],
+						[11,20],
+						[21,50],
+						[50,false]
+					],
+					played_live:	[
+						0,
+						[1,5],
+						[6,10],
+						[11,20],
+						[21,50],
+						[50,false]
+					]
+				};
+				
+				// Convert query parameters (auto-convert values to ints when possible)
+				params.query	= scope.Gamify.api.fixTypes(params.query, {});
+				
+				Gamify.log("params",params);
+				
+				// remove empty query parameters
+				for (i in params.query) {
+					if (params.query[i] == '' && params.query[i] !== 0) {
+						delete params.query[i];
+					}
+				}
+				
+				
+				var stack = new Gamify.stack();
+				
+				
+				// Process the filters
+				var filters = {};
+				_.each(params.filters, function(filter) {
+					filters[filter] = [];
+				});
+				
+				var stats = {};
+				for (filter in filters) {
+					stack.add(function(p, onProcessed) {
+						
+						// db.surveys.aggregate({$match: {race: "launchrace"}}, {$project: {text: "$metas.agerange"}}, {$group: {_id: '$text', "total": {$sum: 1}}})
+						scope.mongo.aggregate({
+							collection:	params.collection,
+							rules:		[{
+								$match: params.query,
+							}, {
+								$project: {
+									text: 	"$"+params.key+"."+p.filter
+								}
+							}, {
+								$group: {
+									_id: 	'$text',
+									total: 	{
+										$sum: 1
+									}
+								}
+							}]
+						}, function(output) {
+							if (output && output.length > 0) {
+								stats[p.filter] = {};
+								_.each(output, function(line) {
+									stats[p.filter][line['_id']] = line.total;
+								});
+							}
+							
+							onProcessed();
+						});
+					}, {filter:filter});
+				}
+				
+				stack.process(function() {
+					stats = scope.Gamify.api.groupAggregates(stats, params.group);
+					
+					callback({
+						stats:		stats
+					});
+				}, false);	// sync
+				
+			}
+		},
+		
+		active: {
+			require:		[],
+			auth:			"sys",
+			description:	"Get demography stats for a race",
+			params:			{query:"Filter"},
+			status:			'dev',
+			version:		1,
+			callback:		function(params, req, res, callback) {
+				
+				Gamify.log("params (1)",params);
 				
 				var i;
 				
@@ -447,6 +563,8 @@ api.prototype.init = function(Gamify, callback){
 				// Convert query parameters (auto-convert values to ints when possible)
 				params.query	= scope.Gamify.api.fixTypes(params.query, {});
 				
+				Gamify.log("params (2)",params);
+				
 				// remove empty query parameters
 				for (i in params.query) {
 					if (params.query[i] == '' && params.query[i] !== 0) {
@@ -454,62 +572,36 @@ api.prototype.init = function(Gamify, callback){
 					}
 				}
 				
-				
 				var stack = new Gamify.stack();
 				
+				var periods = [1, 2, 7, 30, 60];
 				
-				// Process the filters
-				var filters = {
-					age:			[],
-					agerange:		[],
-					city:			[],
-					country:		[],
-					gender:			[],
-					state:			[],
-					timezone:		[],
-					played_arcade:	[],
-					played_live:	[]
-				};
+				var output = [];
 				
-				var stats = {};
-				for (filter in filters) {
+				_.each(periods, function(period) {
 					stack.add(function(p, onProcessed) {
+						var date = new Date( new Date().getTime()-(p.period*24*60*60*1000) );
 						
-						// db.surveys.aggregate({$match: {race: "launchrace"}}, {$project: {text: "$metas.agerange"}}, {$group: {_id: '$text', "total": {$sum: 1}}})
-						scope.mongo.aggregate({
-							collection:	params.collection,
-							rules:		[{
-								$match: params.query,
-							}, {
-								$project: {
-									text: 	"$metas."+p.filter
+						scope.mongo.count({
+							collection:	"users",
+							query:	{
+								"data.recent_activity": {
+									$gt:	date
 								}
-							}, {
-								$group: {
-									_id: 	'$text',
-									total: 	{
-										$sum: 1
-									}
-								}
-							}]
-						}, function(output) {
-							Gamify.log("output", output);
-							if (output && output.length > 0) {
-								stats[p.filter] = {};
-								_.each(output, function(line) {
-									stats[p.filter][line['_id']] = line.total;
-								});
 							}
+						}, function(count) {
+							output.push({
+								days:	p.period,
+								count:	count
+							});
 							
 							onProcessed();
 						});
-					}, {filter:filter});
-				}
+					}, {period:period});
+				});
 				
 				stack.process(function() {
-					callback({
-						stats:		stats
-					});
+					callback(output);
 				}, false);	// sync
 				
 			}
