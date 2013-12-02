@@ -617,7 +617,10 @@ api.prototype.init = function(Gamify, callback){
 					rules:		[{
 						$match: {
 							race:	params.race,
-							live:	true
+							live:	true,
+							'result.total': {
+								$gt: 0	
+							}
 						}
 					}, {
 						$project: {
@@ -633,9 +636,14 @@ api.prototype.init = function(Gamify, callback){
 					}]
 				}, function(output) {
 					
-					var removed = [];
+					var removed = {};
 					
 					_.each(output, function(line) {
+						removed[line._id] = {
+							total:	line.total,
+							line:	line
+						};
+						
 						if (line.total > 1) {
 							stack.add(function(p, onProcessed) {
 								// Find the scores
@@ -644,12 +652,16 @@ api.prototype.init = function(Gamify, callback){
 									query:		{
 										race:	params.race,
 										live:	true,
-										uid:	p.uid
+										uid:	p.uid,
+										'result.total': {
+											$gt: 0	
+										}
 									},
 									sort:	{
 										registered:	1
 									},
 									fields:	{
+										uid:	1,
 										token:	1
 									}
 								}, function(scores) {
@@ -659,23 +671,42 @@ api.prototype.init = function(Gamify, callback){
 										tokens.push(scoreline.token);
 									});
 									
+									removed[p.uid].tokens = _.extend({},tokens);
+									
 									// Remove the first one (we keep it)
 									tokens = tokens.slice(1);
-									removed.push(tokens);
-									// Delete the tokens
-									scope.mongo.remove({
-										collection:		"scores",
-										query:			{
-											race:	params.race,
-											live:	true,
-											uid:	p.uid,
-											token:	{
-												$in:	tokens
+									tokens = _.compact(tokens);
+									
+									removed[p.uid].sliced = _.extend({},tokens);
+									
+									if (tokens.length > 0) {
+										// Delete the tokens
+										scope.mongo.update({
+											collection:		"scores",
+											query:			{
+												race:	params.race,
+												live:	true,
+												uid:	p.uid,
+												token:	{
+													$in:	tokens
+												},
+												'result.total': {
+													$gt: 0	
+												}
+											},
+											data: {
+												$set: {
+													live: 		false,
+													duplicate:	true
+												}
 											}
-										},
-									}, function() {
+										}, function() {
+											onProcessed();
+										});
+									} else {
 										onProcessed();
-									});
+									}
+									
 								});
 							},{uid: line._id});
 						}
