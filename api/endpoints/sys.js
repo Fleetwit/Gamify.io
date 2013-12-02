@@ -134,7 +134,7 @@ api.prototype.init = function(Gamify, callback){
 		
 		importReg: {
 			require:		[],
-			auth:			false,
+			auth:			'sys',
 			description:	"",
 			params:			{},
 			status:			'dev',
@@ -592,7 +592,103 @@ api.prototype.init = function(Gamify, callback){
 				
 				
 			}
-		}
+		},
+		
+		
+		
+		
+		
+		
+		fixRanking: {
+			require:		['race'],
+			auth:			'sys',
+			description:	"",
+			params:			{},
+			status:			'dev',
+			version:		0.1,
+			callback:		function(params, req, res, callback) {
+				
+				
+				var stack = new Gamify.stack();
+				
+				// Find the duplicates
+				scope.mongo.aggregate({
+					collection:	"scores",
+					rules:		[{
+						$match: {
+							race:	params.race,
+							live:	true
+						}
+					}, {
+						$project: {
+							text: 	"$uid"
+						}
+					}, {
+						$group: {
+							_id: 	'$text',
+							total: 	{
+								$sum: 1
+							}
+						}
+					}]
+				}, function(output) {
+					
+					var removed = [];
+					
+					_.each(output, function(line) {
+						if (line.total > 1) {
+							stack.add(function(p, onProcessed) {
+								// Find the scores
+								scope.mongo.find({
+									collection:		"scores",
+									query:		{
+										race:	params.race,
+										live:	true,
+										uid:	p.uid
+									},
+									sort:	{
+										registered:	1
+									},
+									fields:	{
+										token:	1
+									}
+								}, function(scores) {
+									var tokens = [];
+									// List the tokens
+									_.each(scores, function(scoreline) {
+										tokens.push(scoreline.token);
+									});
+									
+									// Remove the first one (we keep it)
+									tokens = tokens.slice(1);
+									removed.push(tokens);
+									// Delete the tokens
+									scope.mongo.remove({
+										collection:		"scores",
+										query:			{
+											race:	params.race,
+											live:	true,
+											uid:	p.uid,
+											token:	{
+												$in:	tokens
+											}
+										},
+									}, function() {
+										onProcessed();
+									});
+								});
+							},{uid: line._id});
+						}
+					});
+					
+					stack.process(function() {
+						callback(removed);
+					}, true);	// async
+				});
+				
+				
+			}
+		},
 		
 	};
 	
