@@ -721,6 +721,212 @@ api.prototype.init = function(Gamify, callback){
 			}
 		},
 		
+		
+		
+		
+		
+		
+		importScoreMetas: {
+			require:		[],
+			auth:			'sys',
+			description:	"import the missing metadatas on the scores data",
+			params:			{},
+			status:			'dev',
+			version:		0.1,
+			callback:		function(params, req, res, callback) {
+				
+				
+				var stack = new Gamify.stack();
+				
+				// List the uids from the scores
+				scope.mongo.distinct({
+					collection:	"scores",
+					key:		"uid"
+				}, function(uids) {
+					// Get the metas for those users
+					scope.mongo.find({
+						collection:	"users",
+						query:	{
+							uid:	{
+								$in:	uids
+							}
+						},
+						fields: {
+							metadatas:	true,
+							uid:		true
+						}
+					}, function(metas) {
+						var indexedMetas = Gamify.utils.indexed(metas, "uid");
+						
+						var i;
+						for (i in indexedMetas) {
+							stack.add(function(p, onProcessed) {
+								
+								// Update the user's account
+								scope.mongo.update({
+									collection:	"scores",
+									query:	{
+										uid:	p.data.uid
+									},
+									data:	{
+										$set: {
+											metas:	p.data.metadatas
+										}
+									}
+								}, function() {
+									onProcessed();
+								});
+								
+							},{data:indexedMetas[i]});
+						}
+						
+						stack.process(function() {
+							callback(indexedMetas);
+						}, true);	// async
+						
+					});
+				});
+				
+				
+			}
+		},
+		
+		
+		
+		
+		
+		
+		recountPlayedRaces: {
+			require:		[],
+			auth:			'sys',
+			description:	"re-count the number of arcade and live races played by the users",
+			params:			{},
+			status:			'dev',
+			version:		0.1,
+			callback:		function(params, req, res, callback) {
+				
+				
+				var stack = new Gamify.stack();
+				
+				// List the uids from the scores
+				scope.mongo.distinct({
+					collection:	"scores",
+					key:		"uid"
+				}, function(uids) {
+					_.each(uids, function(uid) {
+						stack.add(function(p, onProcessed) {
+							
+							var counts = {
+								"metadatas.played_arcade":	0,
+								"metadatas.played_live":	0
+							};
+							
+							var substack = new Gamify.stack();
+							// Count arcade
+							substack.add(function(subp, onSubProcessed) {
+								scope.mongo.count({
+									collection:	"scores",
+									query: {
+										uid:	p.uid,
+										"result.total": {
+											$gt: 0
+										},
+										live:	false
+									}
+								}, function(count) {
+									counts["metadatas.played_arcade"] 		= count;
+									onSubProcessed();
+								});
+							},{});
+							// Count live
+							substack.add(function(subp, onSubProcessed) {
+								scope.mongo.count({
+									collection:	"scores",
+									query: {
+										uid:	p.uid,
+										"result.total": {
+											$gt: 0
+										},
+										live:	true
+									}
+								}, function(count) {
+									counts["metadatas.played_live"] 		= count;
+									onSubProcessed();
+								});
+							},{});
+								
+							substack.process(function() {
+								scope.mongo.update({
+									collection:	"users",
+									query:	{
+										uid:	p.uid
+									},
+									data:	{
+										$set: counts
+									}
+								},function(){
+									onProcessed();
+								});
+							}, true);	// async
+							
+							/*scope.mongo.aggregate({
+								collection:	"scores",
+								rules:		[{
+									$match: {
+										uid:	p.uid,
+										"result.total": {
+											$gt: 0
+										}
+									}
+								}, {
+									$project: {
+										text: 	"$live"
+									}
+								}, {
+									$group: {
+										_id: 	'$text',
+										total: 	{
+											$sum: 1
+										}
+									}
+								}]
+							}, function(output) {
+								var counts = {
+									"metadatas.played_arcade":	0,
+									"metadatas.played_live":	0
+								};
+								_.each(output, function(line) {
+									if (line._id == true) {
+										counts["metadatas.played_live"] 		= line.total;
+									}
+									if (line._id == false) {
+										counts["metadatas.played_arcade"] 		= line.total;
+									}
+								});
+								
+								scope.mongo.update({
+									collection:	"users",
+									query:	{
+										uid:	p.uid
+									},
+									data:	{
+										$set: counts
+									}
+								},function(){
+									onProcessed();
+								});
+							});*/
+						},{uid:uid});
+					});
+					
+					stack.process(function() {
+						callback({});
+					}, true);	// async
+				});
+				
+			}
+		},
+		
 	};
 	
 	// Init a connection

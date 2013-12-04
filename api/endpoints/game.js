@@ -56,9 +56,9 @@ api.prototype.init = function(Gamify, callback){
 					}
 					
 					// Get the user data first
-					scope.Gamify.api.execute("user","find", {query:{uid: params.__auth}}, function(user_response) {
+					scope.Gamify.api.execute("user","get", {authtoken: Gamify.settings.systoken,uid:params.__auth}, function(user_response) {
 						
-						var user = user_response[0];
+						var user = user_response;
 						
 						var starts_in	= Gamify.settings.default_race_time;		// Default timer
 						var can_play	= true;
@@ -118,7 +118,7 @@ api.prototype.init = function(Gamify, callback){
 									multiplier:	0,
 									total:		0
 								},
-								metas:		_.extend({},user.metas)
+								metas:		_.extend({},user.metadatas)
 							}
 						}, function(response) {
 							callback({

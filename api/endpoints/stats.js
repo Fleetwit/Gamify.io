@@ -429,7 +429,7 @@ api.prototype.init = function(Gamify, callback){
 			require:		['collection'],
 			auth:			"sys",
 			description:	"Get demography stats for a race",
-			params:			{collection:"Mongo Collection", query:"Filter", key: "Meta key", filters:"Array"},
+			params:			{collection:"Mongo Collection", query:"Filter", key: "Meta key", filters:"Array", unique:"Unique field"},
 			status:			'dev',
 			version:		1,
 			callback:		function(params, req, res, callback) {
@@ -454,7 +454,7 @@ api.prototype.init = function(Gamify, callback){
 				}
 				
 				params.group = {
-					played_arcade:	[
+					/*played_arcade:	[
 						0,
 						[1,5],
 						[6,10],
@@ -469,21 +469,21 @@ api.prototype.init = function(Gamify, callback){
 						[11,20],
 						[21,50],
 						[50,false]
-					]
+					]*/
 				};
 				
 				// Convert query parameters (auto-convert values to ints when possible)
 				params.query	= scope.Gamify.api.fixTypes(params.query, {});
 				
-				Gamify.log("params",params);
 				
 				// remove empty query parameters
 				for (i in params.query) {
-					if (params.query[i] == '' && params.query[i] !== 0) {
+					if (params.query[i] == '' && params.query[i] !== 0 &&  params.query[i] !== false) {
 						delete params.query[i];
 					}
 				}
 				
+				Gamify.log("params (2)",params);
 				
 				var stack = new Gamify.stack();
 				
@@ -499,32 +499,64 @@ api.prototype.init = function(Gamify, callback){
 					stack.add(function(p, onProcessed) {
 						
 						// db.surveys.aggregate({$match: {race: "launchrace"}}, {$project: {text: "$metas.agerange"}}, {$group: {_id: '$text', "total": {$sum: 1}}})
-						scope.mongo.aggregate({
-							collection:	params.collection,
-							rules:		[{
-								$match: params.query,
-							}, {
-								$project: {
-									text: 	"$"+params.key+"."+p.filter
-								}
-							}, {
-								$group: {
-									_id: 	'$text',
-									total: 	{
-										$sum: 1
-									}
-								}
-							}]
-						}, function(output) {
-							if (output && output.length > 0) {
-								stats[p.filter] = {};
-								_.each(output, function(line) {
-									stats[p.filter][line['_id']] = line.total;
-								});
-							}
+						if (params.unique) {
 							
-							onProcessed();
-						});
+							scope.mongo.aggregate({
+								collection:	params.collection,
+								rules:		[{
+									$match: params.query,
+								}, {
+							    $group: {
+								        _id: {uid: '$uid', groupkey: "$"+params.key+"."+p.filter}
+								    }
+								},{
+									 $group: {
+								        _id: '$_id.groupkey',
+								        total : {
+								            $sum: 1
+								        }
+								    }
+								}]
+							}, function(output) {
+								if (output && output.length > 0) {
+									stats[p.filter] = {};
+									_.each(output, function(line) {
+										stats[p.filter][line['_id']] = line.total;
+									});
+								}
+								
+								onProcessed();
+							});
+							
+							
+						} else {
+							scope.mongo.aggregate({
+								collection:	params.collection,
+								rules:		[{
+									$match: params.query,
+								}, {
+									$project: {
+										text: 	"$"+params.key+"."+p.filter
+									}
+								}, {
+									$group: {
+										_id: 	'$text',
+										total: 	{
+											$sum: 1
+										}
+									}
+								}]
+							}, function(output) {
+								if (output && output.length > 0) {
+									stats[p.filter] = {};
+									_.each(output, function(line) {
+										stats[p.filter][line['_id']] = line.total;
+									});
+								}
+								
+								onProcessed();
+							});
+						}
 					}, {filter:filter});
 				}
 				
