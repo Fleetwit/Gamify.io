@@ -351,6 +351,10 @@ api.prototype.init = function(Gamify, callback){
 			version:		1.2,
 			callback:		function(params, req, res, callback) {
 				
+				params	= scope.Gamify.api.fixTypes(params, {
+					query:	'object'
+				});
+				
 				scope.mongo.find(_.extend(params, {
 					collection:	"users",
 					fields:		{
