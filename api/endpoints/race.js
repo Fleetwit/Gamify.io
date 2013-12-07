@@ -101,7 +101,6 @@ api.prototype.init = function(Gamify, callback){
 				}
 				
 				var paginate = function() {
-					console.log("\n\n\n\n\n\n\n\033[32mParams2:\033[0m",JSON.stringify(params,null,4));
 					
 					scope.mongo.paginate(params, function(response) {
 						var nextParam		= _.extend({},params);
@@ -204,7 +203,7 @@ api.prototype.init = function(Gamify, callback){
 							});
 							
 							
-							// Get the best score
+							// Get the best score (Arcade)
 							stack.add(function(param, onProcessed) {
 								scope.mongo.aggregate({
 									collection:		"scores",
@@ -227,9 +226,6 @@ api.prototype.init = function(Gamify, callback){
 									
 									var user_scores	= Gamify.utils.indexed(aggregated_data, "_id");
 									
-									//console.log("\n\n\n\n\n\n\n\033[32m aggregated_data:\033[0m",aggregated_data,JSON.stringify(user_scores,null,4));
-									
-									
 									for (i in response.data) {
 										if (user_scores[response.data[i].alias] && user_scores[response.data[i].alias].total > 0) {
 											response.data[i].played 	= {
@@ -237,6 +233,47 @@ api.prototype.init = function(Gamify, callback){
 											};
 										} else {
 											response.data[i].played 	= false;
+										}
+									}
+									
+									onProcessed();
+								});
+							});
+							
+							
+							// Get the score (live)
+							stack.add(function(param, onProcessed) {
+								scope.mongo.aggregate({
+									collection:		"scores",
+									match:			{
+										$match:	{
+											uid:	params.__auth,
+											live:	true,
+											'result.total': {
+												$gt:	0
+											}
+										}
+									},
+									group:			{
+										$group: {
+											_id: '$race',
+											total:	{
+												$max:	'$result.total'
+											}
+										}
+									}
+								}, function(aggregated_data) {
+									
+									
+									var user_scores	= Gamify.utils.indexed(aggregated_data, "_id");
+									
+									for (i in response.data) {
+										if (user_scores[response.data[i].alias] && user_scores[response.data[i].alias].total > 0) {
+											response.data[i].played_live 	= {
+												score:	user_scores[response.data[i].alias].total
+											};
+										} else {
+											response.data[i].played_live 	= false;
 										}
 									}
 									

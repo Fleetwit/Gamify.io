@@ -1306,6 +1306,7 @@ api.prototype.init = function(Gamify, callback){
 					}
 					
 					scope.Gamify.api.execute("race","paginate", {
+						__auth:			params.__auth,
 						query: _.extend({
 							alias: {
 								$in: races

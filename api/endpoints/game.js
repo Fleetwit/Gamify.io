@@ -41,11 +41,11 @@ api.prototype.init = function(Gamify, callback){
 				}
 				
 				
-				var startGame = function() {
+				var startGame = function(ex_token, fromlevel, data) {
 					// Calculate the duration
 					var i;
 					var l = race.games.length;
-					var duration = 0;
+					var duration = 0;	// In seconds, not ms
 					for (i=0;i<l;i++) {
 						var settings 	= JSON.parse(race.games[i].settings);
 						var _duration	= settings.time;
@@ -69,11 +69,20 @@ api.prototype.init = function(Gamify, callback){
 						// Does the race exists?
 						if (race) {
 							var race_starts_in	= new Date(race.start_time).getTime()-new Date().getTime();
+							var race_end_in		= race_starts_in+(duration*1000);
 							// live race? Make sure you are not too late
+							
 							if (params.live == true) {
-								// If you're too late, you can't play!
-								if (race_starts_in < (Gamify.settings.max_min_late*60*1000)*-1 && !params.force_entry) {	// param "force_entry" allows to play an expired live race.
-									can_play = false;
+								// If there is a ex_token provided (resume a game), then we make sure the race is not over.
+								if (ex_token) {
+									if (race_end_in < 0) {
+										can_play = false;
+									}
+								} else {
+									// If you're too late, you can't play!
+									if (race_starts_in < (Gamify.settings.max_min_late*60*1000)*-1 && !params.force_entry) {	// param "force_entry" allows to play an expired live race.
+										can_play = false;
+									}
 								}
 								starts_in 			= race_starts_in;
 							} else {
@@ -97,41 +106,63 @@ api.prototype.init = function(Gamify, callback){
 							}
 						}
 						
-						scope.mongo.insert({
-							collection:	scope.collections.scores,
-							data:		{
-								uid:		params.__auth,
-								race:		params.alias,
-								live:		params.live,
-								maxtime:	duration*1000,
-								registered:	new Date(),
-								late:		starts_in<0,
-								snapshot:	starts_in,
-								started:	false,
-								ended:		false,
-								token:		can_play?token:false,		// Game token, used to submit scores
-								scores:		[],
-								imported:	params.imported?true:false,
-								result:	{
-									score:		0,
-									time:		0,
-									multiplier:	0,
-									total:		0
-								},
-								metas:		_.extend({},user.metadatas)
+						// A token was provided, so we keep the same entry
+						if (ex_token) {
+							if (fromlevel) {
+								// Start from a level
+								callback({
+									token:		can_play?ex_token:false,	// No token if you can't play!
+									timer:		starts_in,
+									can_play:	can_play,
+									level:		fromlevel,
+									lastlevel:	data.lastlevel,
+									total:		data.total
+								});
+							} else {
+								// Start from scratch
+								callback({
+									token:		can_play?ex_token:false,	// No token if you can't play!
+									timer:		starts_in,
+									can_play:	can_play
+								});
 							}
-						}, function(response) {
-							callback({
-								token:		can_play?token:false,	// No token if you can't play!
-								timer:		starts_in,
-								can_play:	can_play
+						} else {
+							scope.mongo.insert({
+								collection:	scope.collections.scores,
+								data:		{
+									uid:		params.__auth,
+									race:		params.alias,
+									live:		params.live,
+									maxtime:	duration*1000,
+									registered:	new Date(),
+									late:		starts_in<0,
+									snapshot:	starts_in,
+									started:	false,
+									ended:		false,
+									token:		can_play?token:false,		// Game token, used to submit scores
+									scores:		[],
+									imported:	params.imported?true:false,
+									result:	{
+										score:		0,
+										time:		0,
+										multiplier:	0,
+										total:		0
+									},
+									metas:		_.extend({},user.metadatas)
+								}
+							}, function(response) {
+								callback({
+									token:		can_play?token:false,	// No token if you can't play!
+									timer:		starts_in,
+									can_play:	can_play
+								});
 							});
-						});
+						}
 					});
 				};
 				
 				if (params.live) {
-					// Check if we already played, if it's live
+					// Check if we already played and finished the race, if it's live
 					scope.mongo.count({
 						collection:	"scores",
 						query:	{
@@ -143,15 +174,75 @@ api.prototype.init = function(Gamify, callback){
 							}
 						}
 					},function(count) {
+						Gamify.log("Count (finished race)", count);
 						if (count > 0) {
 							callback({
 								token:		false,	// No token if you can't play!
 								timer:		0,
 								can_play:	false,
+								played_live:	true,
 								reason:		"You already played the live race."
 							});
 						} else {
-							startGame();
+							// Check if we already registered but didn't even start
+							scope.mongo.count({
+								collection:	"scores",
+								query:	{
+									race: 	params.alias,
+									uid:	params.__auth,
+									live:	true,
+									"result.score":	{
+										$gt: 0
+									}
+								}
+							},function(count2) {
+								Gamify.log("Count (race started, unfinished)", count2);
+								if (count2 > 0) {
+									// Resume where he left
+									// Get the score data
+									scope.mongo.find({
+										collection:	"scores",
+										query: {
+											race: 	params.alias,
+											uid:	params.__auth,
+											live:	true,
+											"result.score":	{
+												$gt: 0
+											}
+										}
+									}, function(scoredata) {
+										// Lastlevel and total data to display
+										var data = {
+											lastlevel:	0,
+											total:		0
+										};
+										var scoreline 	= scoredata[0]; // there should be only one.
+										Gamify.log("scoreline", scoreline);
+										// Is there any score?
+										// If not, restart the race from zero, but using the same data, to keep the right time. No clock restart!
+										if (!scoreline.scores || scoreline.scores.length == 0) {
+											startGame(scoreline.token);
+										} else {
+											var last 		= 0; // Find the highest level done
+											_.each(scoreline.scores, function(line) {
+												if (line.level > last) {
+													last 			= line.level;
+													data.lastlevel 	= line.score;
+												}
+												data.total 	+= line.score;
+											});
+											Gamify.log("Start level:", last+1);
+											// Continue the game from the last level done
+											// Get the data:
+											startGame(scoreline.token, last+1, data);
+										}
+									});
+								} else {
+									// Never played, start the race from zero.
+									startGame();
+								}
+							});
+							
 						}
 					});
 				} else {
